@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="FreshAir">
+    <link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+P+/HgAFhAJ/wlseKgAAAABJRU5ErkJggg=="> <title>AQI Alarm</title>
+
+    <style>
+        /* Modern iOS Dark Mode Styling */
+        :root {
+            --bg-color: #000000;
+            --card-bg: #1c1c1e;
+            --text-primary: #ffffff;
+            --text-secondary: #8e8e93;
+            --accent-color: #30d158; /* iOS Green */
+            --danger-color: #ff453a;
+            --separator: #38383a;
+            --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: var(--font-stack);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        header {
+            padding: 60px 20px 20px;
+            text-align: left;
+        }
+
+        h1 {
+            font-size: 34px;
+            font-weight: 700;
+            margin: 0;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 17px;
+            margin-top: 5px;
+        }
+
+        main {
+            flex-grow: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* iOS-style List/Card Group */
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            border-bottom: 0.5px solid var(--separator);
+        }
+
+        .row:last-child {
+            border-bottom: none;
+        }
+
+        label {
+            font-size: 17px;
+        }
+
+        /* Inputs styled to look like native iOS text */
+        input[type="time"], input[type="number"] {
+            background: transparent;
+            border: none;
+            color: var(--accent-color);
+            font-size: 17px;
+            font-family: var(--font-stack);
+            text-align: right;
+            outline: none;
+        }
+
+        /* The Big Display Circle */
+        .status-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px 0;
+        }
+
+        .aqi-circle {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: 4px solid var(--card-bg);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: border-color 0.5s ease;
+        }
+
+        .aqi-value {
+            font-size: 32px;
+            font-weight: 700;
+        }
+
+        .aqi-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        /* Button Styling */
+        .btn-container {
+            padding: 20px;
+            padding-bottom: 50px; /* Space for home bar */
+        }
+
+        button {
+            width: 100%;
+            padding: 18px;
+            border-radius: 14px;
+            border: none;
+            font-size: 17px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        #actionBtn {
+            background-color: var(--accent-color);
+            color: #000;
+        }
+
+        #actionBtn.active {
+            background-color: var(--danger-color);
+            color: #fff;
+        }
+
+        button:active {
+            opacity: 0.7;
+        }
+
+        .hidden { display: none; }
+        
+        /* Pulse animation for active state */
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        .active-state .aqi-circle {
+            animation: pulse 2s infinite;
+            border-color: var(--accent-color);
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>FreshAir</h1>
+        <div class="subtitle" id="clock">--:--</div>
+    </header>
+
+    <main>
+        <div class="status-container">
+            <div class="aqi-circle" id="aqiCircle">
+                <span class="aqi-value" id="currentAqi">--</span>
+                <span class="aqi-label">Current AQI</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="row">
+                <label for="alarmTime">Alarm Time</label>
+                <input type="time" id="alarmTime" required>
+            </div>
+            <div class="row">
+                <label for="aqiThreshold">AQI Threshold</label>
+                <input type="number" id="aqiThreshold" value="50" placeholder="50">
+            </div>
+        </div>
+
+        <p style="font-size: 13px; color: #555; text-align: center; padding: 0 10px;">
+            Alarm sounds if AQI is <strong>below</strong> threshold. <br>
+            App must remain open on screen.
+        </p>
+
+    </main>
+
+    <div class="btn-container">
+        <button id="actionBtn" onclick="toggleAlarm()">Set Alarm</button>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        // To use real data, replace null with your WAQI API Token (e.g. "demo" or your key)
+        // Get one here: https://aqicn.org/data-platform/token/
+        const API_KEY = null; // e.g., "123456789abcdef..."
+        const CITY = "shanghai"; // Change this to your city
+
+        // --- APP STATE ---
+        let alarmInterval = null;
+        let isAlarmActive = false;
+        let audioContext = null;
+
+        // --- DOM ELEMENTS ---
+        const clockEl = document.getElementById('clock');
+        const aqiValueEl = document.getElementById('currentAqi');
+        const aqiCircle = document.getElementById('aqiCircle');
+        const btn = document.getElementById('actionBtn');
+        const timeInput = document.getElementById('alarmTime');
+        const thresholdInput = document.getElementById('aqiThreshold');
+
+        // --- CLOCK & INITIALIZATION ---
+        function updateClock() {
+            const now = new Date();
+            clockEl.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Initialize default time to next hour
+        const now = new Date();
+        now.setHours(now.getHours() + 1);
+        now.setMinutes(0);
+        timeInput.value = now.toTimeString().substring(0,5);
+
+        // --- LOGIC ---
+
+        function toggleAlarm() {
+            if (isAlarmActive) {
+                stopAlarm();
+            } else {
+                startAlarm();
+            }
+        }
+
+        function startAlarm() {
+            // iOS Audio Unlock: Initialize AudioContext on user gesture
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            audioContext.resume();
+
+            if (!timeInput.value || !thresholdInput.value) {
+                alert("Please set a time and AQI limit.");
+                return;
+            }
+
+            isAlarmActive = true;
+            document.body.classList.add('active-state');
+            btn.textContent = "Stop Alarm";
+            btn.classList.add('active');
+            
+            // Disable inputs
+            timeInput.disabled = true;
+            thresholdInput.disabled = true;
+
+            // Start checking loop
+            checkCondition();
+            alarmInterval = setInterval(checkCondition, 1000); // Check every second
+        }
+
+        function stopAlarm() {
+            isAlarmActive = false;
+            clearInterval(alarmInterval);
+            document.body.classList.remove('active-state');
+            btn.textContent = "Set Alarm";
+            btn.classList.remove('active');
+            
+            // Enable inputs
+            timeInput.disabled = false;
+            thresholdInput.disabled = false;
+            
+            // Reset AQI visual
+            aqiValueEl.textContent = "--";
+            aqiCircle.style.borderColor = "var(--card-bg)";
+        }
+
+        async function checkCondition() {
+            const now = new Date();
+            const currentHm = now.toTimeString().substring(0,5);
+            const targetHm = timeInput.value;
+
+            // Update AQI Data (Simulation or Fetch)
+            const currentAQI = await getAQI();
+            
+            // Update UI
+            aqiValueEl.textContent = currentAQI;
+            const threshold = parseInt(thresholdInput.value);
+
+            // Color code the circle
+            if (currentAQI <= threshold) {
+                aqiCircle.style.borderColor = "var(--accent-color)"; // Green/Good
+            } else {
+                aqiCircle.style.borderColor = "var(--danger-color)"; // Red/Bad
+            }
+
+            // Check Time Trigger
+            // We check if the minute matches AND seconds are < 2 to prevent multi-triggering
+            if (currentHm === targetHm && now.getSeconds() < 2) {
+                if (currentAQI < threshold) {
+                    playAlarmSound();
+                    alert(`Wake up! AQI is ${currentAQI} (Good)`);
+                    stopAlarm();
+                } else {
+                    console.log("Alarm skipped: Air quality too poor.");
+                    // Optional: Stop alarm anyway or snooze? 
+                    // For simplicity, we just stop the active monitoring state so it doesn't ring next minute.
+                    stopAlarm(); 
+                }
+            }
+        }
+
+        // --- DATA FETCHING (SIMULATION VS REAL) ---
+        async function getAQI() {
+            if (API_KEY) {
+                // REAL MODE
+                try {
+                    const response = await fetch(`https://api.waqi.info/feed/${CITY}/?token=${API_KEY}`);
+                    const data = await response.json();
+                    if (data.status === 'ok') {
+                        return data.data.aqi;
+                    }
+                } catch (e) {
+                    console.error("API Error", e);
+                }
+            }
+            
+            // SIMULATION MODE (Default)
+            // Generates a random AQI between 20 and 100 for demo purposes
+            return Math.floor(Math.random() * (100 - 20 + 1) + 20);
+        }
+
+        // --- AUDIO ---
+        function playAlarmSound() {
+            // Simple Beep using Web Audio API (No external files needed)
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+            
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(440, audioContext.currentTime); // A4
+            osc.frequency.exponentialRampToValueAtTime(880, audioContext.currentTime + 0.1);
+            
+            gain.gain.setValueAtTime(1, audioContext.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1);
+            
+            osc.start();
+            osc.stop(audioContext.currentTime + 1);
+            
+            // Repeat for a "Alarm" effect
+            setTimeout(() => {
+                const osc2 = audioContext.createOscillator();
+                const gain2 = audioContext.createGain();
+                osc2.connect(gain2);
+                gain2.connect(audioContext.destination);
+                osc2.frequency.setValueAtTime(440, audioContext.currentTime);
+                osc2.start();
+                osc2.stop(audioContext.currentTime + 1);
+            }, 500);
+        }
+
+    </script>
+</body>
+</html>
