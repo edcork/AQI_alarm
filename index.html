@@ -13,10 +13,10 @@
             --card-bg: #1C1C1E;
             --text-primary: #FFFFFF;
             --text-secondary: #8E8E93;
-            --accent-color: #0A84FF; /* iOS Blue */
+            --accent-color: #0A84FF;
             --danger-color: #FF453A;
             --success-color: #30D158;
-            --aqi-moderate: #FFD60A; /* Yellow for Moderate AQI */
+            --aqi-moderate: #FFD60A;
         }
 
         body {
@@ -28,16 +28,14 @@
             height: 100vh;
             display: flex;
             flex-direction: column;
-            overflow: hidden; /* Prevents scrolling the whole page */
+            overflow: hidden;
         }
 
-        /* --- HEADER (Floating Controls) --- */
+        /* --- HEADER --- */
         .header {
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            padding: 50px 20px 10px 20px; /* Top padding clears the iPhone notch */
+            top: 0; left: 0; right: 0;
+            padding: 50px 20px 10px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -45,17 +43,13 @@
         }
 
         .icon-btn {
-            background: none;
-            border: none;
-            color: var(--accent-color);
-            font-size: 24px;
-            cursor: pointer;
-            padding: 10px;
+            background: none; border: none; color: var(--accent-color);
+            font-size: 24px; cursor: pointer; padding: 10px;
         }
 
-        /* --- TOP 1/3: AQI AREA --- */
+        /* --- TOP AREA: AQI DASHBOARD --- */
         #aqi-area {
-            flex: 3.5; /* Takes up roughly 35% of space */
+            flex: 3.5;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -66,137 +60,117 @@
             border-bottom: 1px solid #333;
         }
 
-        .aqi-location {
-            font-size: 18px;
-            font-weight: 500;
-            margin-bottom: 5px;
-            letter-spacing: 0.5px;
-        }
-
+        .aqi-location { font-size: 18px; font-weight: 500; margin-bottom: 5px; }
+        
         .aqi-value {
-            font-size: 80px;
-            font-weight: 700;
-            line-height: 1;
-            margin: 10px 0;
-            color: var(--aqi-moderate); /* Dynamic color based on AQI */
+            font-size: 80px; font-weight: 700; line-height: 1; margin: 10px 0;
+            color: var(--aqi-moderate);
         }
 
         .aqi-status {
-            font-size: 24px;
-            font-weight: 500;
-            color: var(--aqi-moderate);
-            margin-bottom: 15px;
+            font-size: 24px; font-weight: 500; color: var(--aqi-moderate); margin-bottom: 15px;
         }
 
         .aqi-details {
-            display: flex;
-            gap: 15px;
-            font-size: 13px;
-            color: var(--text-secondary);
+            display: flex; flex-direction: column; gap: 5px; /* Stacked labels */
+            font-size: 13px; color: var(--text-secondary);
         }
 
-        .aqi-detail-item {
-            background: #2C2C2E;
-            padding: 6px 12px;
-            border-radius: 12px;
-        }
-
-        /* --- BOTTOM 2/3: ALARMS AREA --- */
+        /* --- BOTTOM AREA: ALARMS LIST --- */
         #alarms-area {
-            flex: 6.5; /* Takes up roughly 65% of space */
-            padding: 20px;
-            overflow-y: auto; /* Allows scrolling if many alarms */
-            display: flex;
-            flex-direction: column;
+            flex: 6.5; padding: 20px; overflow-y: auto;
+            display: flex; flex-direction: column;
+            overflow-x: hidden; /* Prevent horizontal scroll on page */
         }
 
-        .section-title {
-            font-size: 28px;
-            font-weight: 700;
-            margin-bottom: 20px;
-            padding-left: 5px;
-        }
+        .section-title { font-size: 28px; font-weight: 700; margin-bottom: 20px; padding-left: 5px; }
 
-        /* Empty State */
         .empty-state {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            color: var(--text-secondary);
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; height: 100%; color: var(--text-secondary);
         }
 
         .btn-add-alarm-large {
-            background-color: var(--card-bg);
-            color: var(--accent-color);
-            border: 1px solid #333;
-            padding: 15px 30px;
-            border-radius: 25px;
-            font-size: 16px;
-            margin-top: 15px;
-            cursor: pointer;
+            background-color: var(--card-bg); color: var(--accent-color);
+            border: 1px solid #333; padding: 15px 30px; border-radius: 25px;
+            font-size: 16px; margin-top: 15px; cursor: pointer;
         }
 
-        /* Populated State: Alarm Row */
-        .alarm-list {
-            display: none; /* Hidden by default */
-            width: 100%;
-        }
-
-        .alarm-row {
-            background-color: var(--card-bg);
-            border-radius: 16px;
-            padding: 20px;
+        /* --- SWIPEABLE ALARM ROW STYLES --- */
+        .alarm-container {
+            position: relative;
             margin-bottom: 12px;
+            height: 80px; /* Fixed height for simplicity */
+            border-radius: 16px;
+            overflow: hidden; /* Clips the red button until revealed */
+        }
+
+        /* The Red "Delete" Background */
+        .alarm-delete-bg {
+            position: absolute;
+            top: 0; bottom: 0; right: 0;
+            width: 100%;
+            background-color: var(--danger-color);
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            padding-right: 25px;
+            font-weight: 600;
+            font-size: 16px;
+            color: white;
+            z-index: 1;
+        }
+
+        /* The Actual Content (Foreground) */
+        .alarm-row-content {
+            position: relative;
+            background-color: var(--card-bg);
+            width: 100%;
+            height: 100%;
+            padding: 0 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            z-index: 2;
+            box-sizing: border-box;
+            transition: transform 0.2s ease-out; /* Smooth snapping */
         }
 
-        .alarm-info {
+        .alarm-info { display: flex; flex-direction: column; }
+
+        .alarm-top-line {
             display: flex;
-            flex-direction: column;
+            align-items: baseline;
+            gap: 10px;
         }
 
         .alarm-time {
-            font-size: 32px;
-            font-weight: 300;
+            font-size: 26px; /* Slightly reduced from 32 to fit AQI info */
+            font-weight: 400;
             color: var(--text-primary);
+        }
+        
+        .alarm-aqi-limit {
+            font-size: 26px; /* Same size as time, as requested */
+            font-weight: 400;
+            color: var(--text-secondary); /* Greyed out slightly for contrast */
         }
 
         .alarm-label {
-            font-size: 13px;
-            color: var(--text-secondary);
-            margin-top: 4px;
+            font-size: 13px; color: var(--text-secondary); margin-top: 4px;
         }
 
-        /* iOS Toggle Switch */
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 50px;
-            height: 30px;
-        }
+        /* iOS Switch */
+        .switch { position: relative; display: inline-block; width: 50px; height: 30px; flex-shrink: 0;}
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background-color: #3a3a3c;
-            transition: .4s;
-            border-radius: 34px;
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #3a3a3c; transition: .4s; border-radius: 34px;
         }
         .slider:before {
-            position: absolute;
-            content: "";
-            height: 26px;
-            width: 26px;
-            left: 2px;
-            bottom: 2px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
+            position: absolute; content: ""; height: 26px; width: 26px;
+            left: 2px; bottom: 2px; background-color: white;
+            transition: .4s; border-radius: 50%;
         }
         input:checked + .slider { background-color: var(--success-color); }
         input:checked + .slider:before { transform: translateX(20px); }
@@ -224,10 +198,9 @@
         <div class="aqi-location">Shanghai</div>
         <div class="aqi-value">85</div>
         <div class="aqi-status">Moderate</div>
-        
         <div class="aqi-details">
-            <div class="aqi-detail-item">PM2.5</div>
-            <div class="aqi-detail-item">Updated 10:45 AM</div>
+            <div>Major pollutant: PM2.5</div>
+            <div>Last updated: 10:45 AM</div>
         </div>
     </section>
 
@@ -239,14 +212,11 @@
             <button class="btn-add-alarm-large" onclick="openAddAlarm()">+ Add Alarm</button>
         </div>
 
-        <div id="alarm-list-container" class="alarm-list">
+        <div id="alarm-list-container" class="alarm-list" style="display: none;">
             </div>
     </section>
 
     <script>
-        // --- LOGIC ---
-
-        // Mock State: Start with 0 alarms
         let alarms = []; 
 
         function renderAlarms() {
@@ -254,51 +224,97 @@
             const listContainer = document.getElementById('alarm-list-container');
 
             if (alarms.length === 0) {
-                // Show Button, Hide List
                 emptyState.style.display = 'flex';
                 listContainer.style.display = 'none';
             } else {
-                // Hide Button, Show List
                 emptyState.style.display = 'none';
                 listContainer.style.display = 'block';
 
-                // Render the list items
                 listContainer.innerHTML = alarms.map((alarm, index) => `
-                    <div class="alarm-row">
-                        <div class="alarm-info">
-                            <span class="alarm-time">${alarm.time}</span>
-                            <span class="alarm-label">${alarm.label} • AQI < ${alarm.aqiLimit}</span>
+                    <div class="alarm-container">
+                        <div class="alarm-delete-bg" onclick="deleteAlarm(${index})">Delete</div>
+                        
+                        <div class="alarm-row-content" 
+                             id="row-${index}"
+                             ontouchstart="handleTouchStart(event, ${index})"
+                             ontouchmove="handleTouchMove(event, ${index})"
+                             ontouchend="handleTouchEnd(event, ${index})">
+                             
+                            <div class="alarm-info">
+                                <div class="alarm-top-line">
+                                    <span class="alarm-time">${alarm.time}</span>
+                                    <span class="alarm-aqi-limit">AQI < ${alarm.aqiLimit}</span>
+                                </div>
+                                <span class="alarm-label">${alarm.label}</span>
+                            </div>
+                            
+                            <label class="switch">
+                                <input type="checkbox" checked>
+                                <span class="slider"></span>
+                            </label>
                         </div>
-                        <label class="switch">
-                            <input type="checkbox" checked>
-                            <span class="slider"></span>
-                        </label>
                     </div>
                 `).join('');
             }
         }
 
-        // --- NAVIGATION MOCKS ---
-        
-        function openSettings() {
-            alert("Settings Screen (Coming Soon)");
+        // --- SWIPE LOGIC ---
+        let startX = 0;
+        let currentSwipeIndex = -1;
+
+        function handleTouchStart(e, index) {
+            startX = e.touches[0].clientX;
+            currentSwipeIndex = index;
         }
 
+        function handleTouchMove(e, index) {
+            if (currentSwipeIndex !== index) return;
+            
+            const currentX = e.touches[0].clientX;
+            const diff = currentX - startX;
+            const row = document.getElementById(`row-${index}`);
+
+            // Only allow swiping LEFT (negative values)
+            if (diff < 0 && diff > -100) {
+                row.style.transform = `translateX(${diff}px)`;
+            }
+        }
+
+        function handleTouchEnd(e, index) {
+            const row = document.getElementById(`row-${index}`);
+            // If we swiped row style transform value (we have to parse it)
+            // Simpler way: just check end position vs start
+            const endX = e.changedTouches[0].clientX;
+            const diff = endX - startX;
+
+            // Threshold: if swiped more than 80px left
+            if (diff < -80) {
+                // Snap open
+                row.style.transform = `translateX(-100px)`;
+            } else {
+                // Snap back closed
+                row.style.transform = `translateX(0px)`;
+            }
+        }
+
+        function deleteAlarm(index) {
+            if (confirm("Delete this alarm?")) {
+                alarms.splice(index, 1);
+                renderAlarms();
+            } else {
+                // Reset position if cancelled
+                renderAlarms(); 
+            }
+        }
+
+        // --- MOCKS ---
+        function openSettings() { alert("Settings"); }
         function openAddAlarm() {
-            // For this design sketch, clicking "Add" will just
-            // automatically create a fake alarm so you can see the layout change.
-            const newAlarm = {
-                time: "06:30",
-                label: "Morning Run",
-                aqiLimit: 100
-            };
-            alarms.push(newAlarm);
+            alarms.push({ time: "06:30", label: "Morning Run", aqiLimit: 100 });
             renderAlarms();
         }
 
-        // Initialize view
         renderAlarms();
-
     </script>
 </body>
 </html>
