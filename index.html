@@ -8,162 +8,297 @@
     <title>AQI Alarm</title>
     
     <style>
+        :root {
+            --bg-color: #000000;
+            --card-bg: #1C1C1E;
+            --text-primary: #FFFFFF;
+            --text-secondary: #8E8E93;
+            --accent-color: #0A84FF; /* iOS Blue */
+            --danger-color: #FF453A;
+            --success-color: #30D158;
+            --aqi-moderate: #FFD60A; /* Yellow for Moderate AQI */
+        }
+
         body {
-            background-color: #121212;
-            color: #ffffff;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* Prevents scrolling the whole page */
+        }
+
+        /* --- HEADER (Floating Controls) --- */
+        .header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 50px 20px 10px 20px; /* Top padding clears the iPhone notch */
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .icon-btn {
+            background: none;
+            border: none;
+            color: var(--accent-color);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 10px;
+        }
+
+        /* --- TOP 1/3: AQI AREA --- */
+        #aqi-area {
+            flex: 3.5; /* Takes up roughly 35% of space */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 60px 20px 20px;
+            background: linear-gradient(180deg, #1c1c1e 0%, #000000 100%);
+            border-bottom: 1px solid #333;
+        }
+
+        .aqi-location {
+            font-size: 18px;
+            font-weight: 500;
+            margin-bottom: 5px;
+            letter-spacing: 0.5px;
+        }
+
+        .aqi-value {
+            font-size: 80px;
+            font-weight: 700;
+            line-height: 1;
+            margin: 10px 0;
+            color: var(--aqi-moderate); /* Dynamic color based on AQI */
+        }
+
+        .aqi-status {
+            font-size: 24px;
+            font-weight: 500;
+            color: var(--aqi-moderate);
+            margin-bottom: 15px;
+        }
+
+        .aqi-details {
+            display: flex;
+            gap: 15px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .aqi-detail-item {
+            background: #2C2C2E;
+            padding: 6px 12px;
+            border-radius: 12px;
+        }
+
+        /* --- BOTTOM 2/3: ALARMS AREA --- */
+        #alarms-area {
+            flex: 6.5; /* Takes up roughly 65% of space */
+            padding: 20px;
+            overflow-y: auto; /* Allows scrolling if many alarms */
+            display: flex;
+            flex-direction: column;
+        }
+
+        .section-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            padding-left: 5px;
+        }
+
+        /* Empty State */
+        .empty-state {
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            min-height: 100vh; /* Changed to min-height for scrolling if needed */
-            margin: 0;
-            padding: 20px;
-            text-align: center;
+            height: 100%;
+            color: var(--text-secondary);
         }
 
-        h1 { font-size: 24px; font-weight: 300; margin-bottom: 30px; opacity: 0.8; }
-
-        #current-time {
-            font-size: 60px;
-            font-weight: 700;
-            margin-bottom: 30px;
-            font-variant-numeric: tabular-nums;
-        }
-
-        .control-group {
-            background: #1e1e1e;
-            padding: 15px;
-            border-radius: 16px;
-            width: 100%;
-            max-width: 320px;
-            margin-bottom: 15px;
-            text-align: left; /* Better for labels */
-        }
-
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-size: 12px;
-            color: #aaaaaa;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            font-weight: 600;
-        }
-
-        input {
-            width: 100%;
-            padding: 12px;
-            font-size: 18px;
+        .btn-add-alarm-large {
+            background-color: var(--card-bg);
+            color: var(--accent-color);
             border: 1px solid #333;
-            border-radius: 8px;
-            background: #2c2c2e;
-            color: white;
-            box-sizing: border-box;
-        }
-
-        button {
-            background-color: #0A84FF;
-            color: white;
-            border: none;
-            padding: 18px;
-            width: 100%;
-            max-width: 320px;
-            font-size: 18px;
-            font-weight: 600;
-            border-radius: 12px;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            margin-top: 15px;
             cursor: pointer;
-            margin-top: 10px;
         }
 
-        button:active { transform: scale(0.98); opacity: 0.8; }
+        /* Populated State: Alarm Row */
+        .alarm-list {
+            display: none; /* Hidden by default */
+            width: 100%;
+        }
 
-        .status-message {
-            margin-top: 20px;
-            font-size: 14px;
-            color: #888;
-            line-height: 1.4;
-            max-width: 300px;
+        .alarm-row {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        
-        /* New: Style for the live AQI reading */
-        .live-aqi {
-            font-weight: bold;
-            color: #FFD60A; /* Yellow */
+
+        .alarm-info {
+            display: flex;
+            flex-direction: column;
         }
+
+        .alarm-time {
+            font-size: 32px;
+            font-weight: 300;
+            color: var(--text-primary);
+        }
+
+        .alarm-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* iOS Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 30px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #3a3a3c;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--success-color); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
     </style>
 </head>
 <body>
 
-    <h1>AQI Smart Alarm</h1>
-
-    <div id="current-time">--:--</div>
-
-    <div class="control-group">
-        <label>City Name</label>
-        <input type="text" id="city-input" value="shanghai" placeholder="e.g. london">
+    <div class="header">
+        <button class="icon-btn" onclick="openSettings()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+        </button>
+        <button class="icon-btn" onclick="openAddAlarm()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+        </button>
     </div>
 
-    <div class="control-group">
-        <label>Wake me up at:</label>
-        <input type="time" id="alarm-time">
-    </div>
+    <section id="aqi-area">
+        <div class="aqi-location">Shanghai</div>
+        <div class="aqi-value">85</div>
+        <div class="aqi-status">Moderate</div>
+        
+        <div class="aqi-details">
+            <div class="aqi-detail-item">PM2.5</div>
+            <div class="aqi-detail-item">Updated 10:45 AM</div>
+        </div>
+    </section>
 
-    <div class="control-group">
-        <label>Only if AQI is below:</label>
-        <input type="number" id="aqi-threshold" placeholder="e.g. 100">
-    </div>
+    <section id="alarms-area">
+        <div class="section-title">Alarms</div>
 
-    <button onclick="testConnection()">Test AQI Connection</button>
+        <div id="empty-state" class="empty-state">
+            <p>No alarms configured</p>
+            <button class="btn-add-alarm-large" onclick="openAddAlarm()">+ Add Alarm</button>
+        </div>
 
-    <div class="status-message" id="status">Enter settings and test connection.</div>
+        <div id="alarm-list-container" class="alarm-list">
+            </div>
+    </section>
 
     <script>
-        // --- CONFIGURATION ---
-        // TODO: PASTE YOUR TOKEN BELOW INSIDE THE QUOTES
-        const API_TOKEN = 'da26d3ac784af6fd3950dd9958e7a1df4e8f12b6'; 
-        // ---------------------
+        // --- LOGIC ---
 
-        function updateClock() {
-            const now = new Date();
-            const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            document.getElementById('current-time').innerText = timeString;
-        }
-        setInterval(updateClock, 1000);
-        updateClock();
+        // Mock State: Start with 0 alarms
+        let alarms = []; 
 
-        // 3. This function fetches the real data
-        async function testConnection() {
-            const city = document.getElementById('city-input').value;
-            const statusDiv = document.getElementById('status');
-            
-            if (API_TOKEN === 'PASTE_YOUR_TOKEN_HERE' || API_TOKEN === '') {
-                statusDiv.innerText = "Error: You forgot to paste your API Token in the code!";
-                statusDiv.style.color = "#FF453A";
-                return;
-            }
+        function renderAlarms() {
+            const emptyState = document.getElementById('empty-state');
+            const listContainer = document.getElementById('alarm-list-container');
 
-            statusDiv.innerText = "Checking air quality...";
-            statusDiv.style.color = "#aaaaaa";
+            if (alarms.length === 0) {
+                // Show Button, Hide List
+                emptyState.style.display = 'flex';
+                listContainer.style.display = 'none';
+            } else {
+                // Hide Button, Show List
+                emptyState.style.display = 'none';
+                listContainer.style.display = 'block';
 
-            try {
-                // This is the "Phone Call" to the API
-                const response = await fetch(`https://api.waqi.info/feed/${city}/?token=${API_TOKEN}`);
-                const data = await response.json();
-
-                if (data.status === 'ok') {
-                    const currentAQI = data.data.aqi;
-                    statusDiv.innerHTML = `Success! Current AQI in ${city} is <span class="live-aqi">${currentAQI}</span>.`;
-                    statusDiv.style.color = "#ffffff";
-                } else {
-                    statusDiv.innerText = "Error: Could not find that city. Try a major city name.";
-                    statusDiv.style.color = "#FF453A";
-                }
-            } catch (error) {
-                statusDiv.innerText = "Network Error: Check your internet connection.";
-                statusDiv.style.color = "#FF453A";
+                // Render the list items
+                listContainer.innerHTML = alarms.map((alarm, index) => `
+                    <div class="alarm-row">
+                        <div class="alarm-info">
+                            <span class="alarm-time">${alarm.time}</span>
+                            <span class="alarm-label">${alarm.label} • AQI < ${alarm.aqiLimit}</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                `).join('');
             }
         }
+
+        // --- NAVIGATION MOCKS ---
+        
+        function openSettings() {
+            alert("Settings Screen (Coming Soon)");
+        }
+
+        function openAddAlarm() {
+            // For this design sketch, clicking "Add" will just
+            // automatically create a fake alarm so you can see the layout change.
+            const newAlarm = {
+                time: "06:30",
+                label: "Morning Run",
+                aqiLimit: 100
+            };
+            alarms.push(newAlarm);
+            renderAlarms();
+        }
+
+        // Initialize view
+        renderAlarms();
+
     </script>
 </body>
 </html>
