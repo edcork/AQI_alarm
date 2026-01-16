@@ -18,6 +18,7 @@
             --success-color: #30D158;
             --aqi-moderate: #FFD60A;
             --input-bg: #2C2C2E;
+            --separator-color: #3A3A3C;
         }
 
         body {
@@ -72,9 +73,13 @@
             font-size: 24px; font-weight: 500; color: var(--aqi-moderate); margin-bottom: 15px;
         }
 
+        /* Updated to be on the same line */
         .aqi-details {
-            display: flex; flex-direction: column; gap: 5px;
-            font-size: 13px; color: var(--text-secondary);
+            display: flex; 
+            flex-direction: row; 
+            gap: 15px; 
+            font-size: 13px; 
+            color: var(--text-secondary);
         }
 
         /* --- BOTTOM AREA: ALARMS LIST --- */
@@ -101,12 +106,11 @@
         .alarm-container {
             position: relative;
             margin-bottom: 12px;
-            height: 90px; /* Increased slightly to fit Label + Details */
+            height: 90px;
             border-radius: 16px;
             overflow: hidden;
         }
 
-        /* The Red "Delete" Background */
         .alarm-delete-bg {
             position: absolute;
             top: 0; bottom: 0; right: 0;
@@ -122,7 +126,6 @@
             z-index: 1;
         }
 
-        /* The Actual Content (Foreground) */
         .alarm-row-content {
             position: relative;
             background-color: var(--card-bg);
@@ -153,7 +156,7 @@
             font-size: 13px; color: var(--text-secondary); margin-top: 2px;
         }
 
-        /* iOS Switch */
+        /* Switch */
         .switch { position: relative; display: inline-block; width: 50px; height: 30px; flex-shrink: 0;}
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider {
@@ -183,6 +186,8 @@
             border-top-left-radius: 20px; border-top-right-radius: 20px;
             padding: 25px; box-sizing: border-box;
             animation: slideUp 0.3s ease-out;
+            max-height: 90vh;
+            overflow-y: auto;
         }
         @keyframes slideUp {
             from { transform: translateY(100%); }
@@ -208,6 +213,59 @@
             background-position: right 15px top 50%;
             background-size: 12px auto;
         }
+
+        /* CUSTOM MULTI-SELECT STYLES */
+        .custom-select-wrapper {
+            background-color: var(--input-bg);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .custom-select-trigger {
+            padding: 12px;
+            font-size: 16px;
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .custom-select-trigger::after {
+            content: '';
+            width: 12px; height: 12px;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%230A84FF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat;
+            background-size: contain;
+            transition: transform 0.2s;
+        }
+        .custom-select-wrapper.open .custom-select-trigger::after {
+            transform: rotate(180deg);
+        }
+        .custom-options {
+            display: none;
+            border-top: 1px solid var(--separator-color);
+        }
+        .custom-select-wrapper.open .custom-options {
+            display: block;
+        }
+        .custom-option {
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--separator-color);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 15px;
+        }
+        .custom-option:last-child { border-bottom: none; }
+        .custom-option.selected {
+            color: var(--accent-color);
+            background-color: rgba(10, 132, 255, 0.1);
+        }
+        .custom-option.selected::after {
+            content: '✓';
+            font-weight: bold;
+        }
+
 
         .modal-actions { display: flex; gap: 15px; margin-top: 25px; }
         .btn-modal {
@@ -240,8 +298,9 @@
         <div class="aqi-value">85</div>
         <div class="aqi-status">Moderate</div>
         <div class="aqi-details">
-            <div>Major pollutant: PM2.5</div>
-            <div>Last updated: 10:45 AM</div>
+            <span>Major pollutant: PM2.5</span>
+            <span>•</span>
+            <span>Last updated: 10:45 AM</span>
         </div>
     </section>
 
@@ -278,12 +337,21 @@
 
             <div class="form-group">
                 <label class="form-label">Repeat</label>
-                <select id="new-repeat" class="form-select">
-                    <option value="once">Once</option>
-                    <option value="daily">Daily</option>
-                    <option value="weekdays">Weekdays</option>
-                    <option value="weekends">Weekends</option>
-                </select>
+                <div class="custom-select-wrapper" id="repeat-wrapper">
+                    <div class="custom-select-trigger" onclick="toggleRepeatDropdown()">
+                        <span id="repeat-text">Never</span>
+                    </div>
+                    <div class="custom-options">
+                        <div class="custom-option selected" data-value="Never" onclick="selectRepeat('Never')">Never</div>
+                        <div class="custom-option" data-value="Mondays" onclick="selectRepeat('Mondays')">Mondays</div>
+                        <div class="custom-option" data-value="Tuesdays" onclick="selectRepeat('Tuesdays')">Tuesdays</div>
+                        <div class="custom-option" data-value="Wednesdays" onclick="selectRepeat('Wednesdays')">Wednesdays</div>
+                        <div class="custom-option" data-value="Thursdays" onclick="selectRepeat('Thursdays')">Thursdays</div>
+                        <div class="custom-option" data-value="Fridays" onclick="selectRepeat('Fridays')">Fridays</div>
+                        <div class="custom-option" data-value="Saturdays" onclick="selectRepeat('Saturdays')">Saturdays</div>
+                        <div class="custom-option" data-value="Sundays" onclick="selectRepeat('Sundays')">Sundays</div>
+                    </div>
+                </div>
             </div>
 
             <div class="form-group">
@@ -305,6 +373,7 @@
 
     <script>
         let alarms = []; 
+        let selectedDays = ["Never"];
 
         function renderAlarms() {
             const emptyState = document.getElementById('empty-state');
@@ -333,7 +402,7 @@
                                     <span class="alarm-aqi-limit">AQI > ${alarm.aqiLimit}</span>
                                 </div>
                                 ${alarm.label ? `<div class="alarm-label">${alarm.label}</div>` : ''}
-                                <div class="alarm-details">${alarm.repeat} • ${alarm.sound}</div>
+                                <div class="alarm-details">${formatDays(alarm.repeat)} • ${alarm.sound}</div>
                             </div>
                             
                             <label class="switch">
@@ -344,6 +413,14 @@
                     </div>
                 `).join('');
             }
+        }
+
+        // Helper to display days nicely
+        function formatDays(daysArray) {
+            if (daysArray.includes("Never")) return "Once";
+            if (daysArray.length === 7) return "Daily";
+            // Abbreviate if list is long
+            return daysArray.map(d => d.slice(0, 3)).join(", ");
         }
 
         // --- SWIPE LOGIC ---
@@ -362,7 +439,6 @@
             const diff = currentX - startX;
             const row = document.getElementById(`row-${index}`);
 
-            // Only allow swiping LEFT (negative values)
             if (diff < 0 && diff > -100) {
                 row.style.transform = `translateX(${diff}px)`;
             }
@@ -373,26 +449,27 @@
             const endX = e.changedTouches[0].clientX;
             const diff = endX - startX;
 
-            // Threshold: if swiped more than 80px left
             if (diff < -80) {
-                // Snap open
                 row.style.transform = `translateX(-100px)`;
             } else {
-                // Snap back closed
                 row.style.transform = `translateX(0px)`;
             }
         }
 
         function deleteAlarm(index) {
-            // Confirmation removed per request
             alarms.splice(index, 1);
             renderAlarms();
         }
 
-        // --- MODAL LOGIC ---
+        // --- MODAL & REPEAT LOGIC ---
         function openSettings() { alert("Settings"); }
 
         function openAddAlarm() {
+            // Reset state
+            selectedDays = ["Never"];
+            updateRepeatUI();
+            document.getElementById('new-label').value = "";
+            document.getElementById('repeat-wrapper').classList.remove('open');
             document.getElementById('add-modal').style.display = 'flex';
         }
 
@@ -400,26 +477,80 @@
             document.getElementById('add-modal').style.display = 'none';
         }
 
+        // Toggle dropdown open/close
+        function toggleRepeatDropdown() {
+            document.getElementById('repeat-wrapper').classList.toggle('open');
+        }
+
+        // Handle day selection logic
+        function selectRepeat(value) {
+            const options = document.querySelectorAll('.custom-option');
+            
+            if (value === "Never") {
+                selectedDays = ["Never"];
+            } else {
+                // If "Never" is currently selected, remove it
+                if (selectedDays.includes("Never")) {
+                    selectedDays = [];
+                }
+
+                // Toggle the clicked day
+                const idx = selectedDays.indexOf(value);
+                if (idx > -1) {
+                    selectedDays.splice(idx, 1);
+                } else {
+                    selectedDays.push(value);
+                }
+
+                // If no days left, revert to "Never"
+                if (selectedDays.length === 0) {
+                    selectedDays = ["Never"];
+                }
+            }
+            updateRepeatUI();
+        }
+
+        function updateRepeatUI() {
+            const options = document.querySelectorAll('.custom-option');
+            
+            // Update visual selection
+            options.forEach(opt => {
+                if (selectedDays.includes(opt.getAttribute('data-value'))) {
+                    opt.classList.add('selected');
+                } else {
+                    opt.classList.remove('selected');
+                }
+            });
+
+            // Update trigger text
+            const textSpan = document.getElementById('repeat-text');
+            if (selectedDays.includes("Never")) {
+                textSpan.innerText = "Never";
+            } else {
+                // Sort days (optional optimization: map days to index to sort correctly)
+                const dayOrder = ["Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays", "Sundays"];
+                selectedDays.sort((a, b) => dayOrder.indexOf(a) - dayOrder.indexOf(b));
+                textSpan.innerText = selectedDays.map(d => d.slice(0, 3)).join(", ");
+            }
+        }
+
         function saveAlarm() {
             const timeVal = document.getElementById('new-time').value;
             const labelVal = document.getElementById('new-label').value;
             const aqiVal = document.getElementById('new-aqi').value;
-            const repeatVal = document.getElementById('new-repeat').value;
             const soundVal = document.getElementById('new-sound').value;
 
+            // Use the global selectedDays array
             alarms.push({ 
                 time: timeVal,
-                label: labelVal, // Capture label
+                label: labelVal,
                 aqiLimit: aqiVal, 
-                repeat: capitalize(repeatVal), 
+                repeat: [...selectedDays], // Store copy of array
                 sound: capitalize(soundVal)
             });
 
             renderAlarms();
             closeAddAlarm();
-            
-            // Optional: reset input fields
-            document.getElementById('new-label').value = "";
         }
 
         function capitalize(s) {
