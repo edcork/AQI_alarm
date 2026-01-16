@@ -180,21 +180,38 @@
             display: none; align-items: flex-end; justify-content: center;
         }
         
-        /* Action Sheet (The Add Menu) */
-        .action-sheet {
-            background-color: var(--card-bg); width: 95%; max-width: 400px;
-            border-radius: 14px; margin-bottom: 20px; overflow: hidden;
-            animation: slideUp 0.2s ease-out;
+        /* NEW: Top Right Action Menu */
+        .menu-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5); z-index: 100;
+            display: none; /* Hidden by default */
         }
+
+        .action-menu {
+            position: absolute;
+            top: 70px; /* Below the header icon */
+            right: 20px;
+            width: 200px;
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+            display: flex; flex-direction: column;
+            animation: fadeIn 0.2s ease-out;
+            z-index: 101;
+        }
+
         .action-btn {
-            width: 100%; padding: 18px; background: none; border: none;
+            width: 100%; padding: 15px 20px; background: none; border: none;
             border-bottom: 1px solid var(--separator-color);
-            color: var(--accent-color); font-size: 18px; cursor: pointer;
+            color: var(--accent-color); font-size: 16px; cursor: pointer;
+            text-align: left;
         }
         .action-btn:last-child { border-bottom: none; }
-        .action-cancel {
-            margin-top: 10px; background-color: var(--card-bg);
-            border-radius: 14px; font-weight: 600; color: var(--danger-color);
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
         }
 
         /* Full Modals (Add Alarm, Add Location) */
@@ -295,12 +312,11 @@
         <div id="alarm-list-container" class="alarm-list" style="display: none;"></div>
     </section>
 
-    <div id="menu-modal" class="modal-overlay" style="align-items: flex-end;">
-        <div class="action-sheet">
+    <div id="menu-modal" class="menu-overlay" onclick="closeAddMenu()">
+        <div class="action-menu" onclick="event.stopPropagation()">
             <button class="action-btn" onclick="selectMenuOption('alarm')">Add Alarm</button>
             <button class="action-btn" onclick="selectMenuOption('location')">Add Location</button>
         </div>
-        <button class="action-cancel" style="width: 95%; max-width: 400px; padding: 18px; margin-bottom: 20px; border: none; font-size: 18px; cursor: pointer;" onclick="closeAddMenu()">Cancel</button>
     </div>
 
     <div id="add-modal" class="modal-overlay">
@@ -527,7 +543,7 @@
         function openSettings() { alert("Settings"); }
 
         function openAddMenu() {
-            document.getElementById('menu-modal').style.display = 'flex';
+            document.getElementById('menu-modal').style.display = 'block'; // Block for menu overlay
         }
         function closeAddMenu() {
             document.getElementById('menu-modal').style.display = 'none';
