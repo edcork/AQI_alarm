@@ -73,7 +73,7 @@
             font-size: 24px; font-weight: 500; color: var(--aqi-moderate); margin-bottom: 15px;
         }
 
-        /* Updated to be on the same line */
+        /* AQI Details on same line */
         .aqi-details {
             display: flex; 
             flex-direction: row; 
@@ -402,7 +402,7 @@
                                     <span class="alarm-aqi-limit">AQI > ${alarm.aqiLimit}</span>
                                 </div>
                                 ${alarm.label ? `<div class="alarm-label">${alarm.label}</div>` : ''}
-                                <div class="alarm-details">${formatDays(alarm.repeat)} • ${alarm.sound}</div>
+                                <div class="alarm-details">${formatDays(alarm.repeat)}</div>
                             </div>
                             
                             <label class="switch">
@@ -484,8 +484,6 @@
 
         // Handle day selection logic
         function selectRepeat(value) {
-            const options = document.querySelectorAll('.custom-option');
-            
             if (value === "Never") {
                 selectedDays = ["Never"];
             } else {
@@ -527,7 +525,7 @@
             if (selectedDays.includes("Never")) {
                 textSpan.innerText = "Never";
             } else {
-                // Sort days (optional optimization: map days to index to sort correctly)
+                // Sort days
                 const dayOrder = ["Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays", "Sundays"];
                 selectedDays.sort((a, b) => dayOrder.indexOf(a) - dayOrder.indexOf(b));
                 textSpan.innerText = selectedDays.map(d => d.slice(0, 3)).join(", ");
