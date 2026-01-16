@@ -341,8 +341,8 @@
                 <label class="form-label">AQI Threshold</label>
                 <div class="input-group-row">
                     <select id="new-aqi-op" class="form-select">
+                        <option value="lt" selected>Below</option>
                         <option value="gt">Above</option>
-                        <option value="lt">Below</option>
                     </select>
                     <input type="number" id="new-aqi" class="form-input" value="100" placeholder="150">
                 </div>
@@ -487,7 +487,7 @@
             selectedDays = ["Never"];
             updateRepeatUI();
             document.getElementById('new-label').value = "";
-            document.getElementById('new-aqi-op').value = "gt"; // Default to Above
+            document.getElementById('new-aqi-op').value = "lt"; // Default to Below
             document.getElementById('repeat-wrapper').classList.remove('open');
             document.getElementById('add-modal').style.display = 'flex';
         }
