@@ -147,7 +147,7 @@
         }
 
         .alarm-time { font-size: 26px; font-weight: 400; color: var(--text-primary); }
-        .alarm-aqi-limit { font-size: 26px; font-weight: 400; color: var(--text-secondary); }
+        .alarm-condition { font-size: 26px; font-weight: 400; color: var(--text-secondary); }
 
         .alarm-label {
             font-size: 15px; color: var(--text-primary); font-weight: 500; margin-top: 2px;
@@ -213,6 +213,13 @@
             background-position: right 15px top 50%;
             background-size: 12px auto;
         }
+
+        /* Combined Input Group for Logic */
+        .input-group-row {
+            display: flex; gap: 10px;
+        }
+        .input-group-row .form-select { flex: 1; }
+        .input-group-row .form-input { flex: 1; }
 
         /* CUSTOM MULTI-SELECT STYLES */
         .custom-select-wrapper {
@@ -331,8 +338,14 @@
             </div>
 
             <div class="form-group">
-                <label class="form-label">AQI Limit (Alarm if above)</label>
-                <input type="number" id="new-aqi" class="form-input" value="100" placeholder="e.g. 150">
+                <label class="form-label">AQI Threshold</label>
+                <div class="input-group-row">
+                    <select id="new-aqi-op" class="form-select">
+                        <option value="gt">Above</option>
+                        <option value="lt">Below</option>
+                    </select>
+                    <input type="number" id="new-aqi" class="form-input" value="100" placeholder="150">
+                </div>
             </div>
 
             <div class="form-group">
@@ -386,7 +399,13 @@
                 emptyState.style.display = 'none';
                 listContainer.style.display = 'block';
 
-                listContainer.innerHTML = alarms.map((alarm, index) => `
+                listContainer.innerHTML = alarms.map((alarm, index) => {
+                    // Logic to format the condition text
+                    const mainCondition = alarm.conditions[0];
+                    const opSymbol = mainCondition.operator === 'gt' ? '>' : '<';
+                    const displayCondition = `AQI ${opSymbol} ${mainCondition.value}`;
+
+                    return `
                     <div class="alarm-container">
                         <div class="alarm-delete-bg" onclick="deleteAlarm(${index})">Delete</div>
                         
@@ -399,7 +418,7 @@
                             <div class="alarm-info">
                                 <div class="alarm-top-line">
                                     <span class="alarm-time">${alarm.time}</span>
-                                    <span class="alarm-aqi-limit">AQI > ${alarm.aqiLimit}</span>
+                                    <span class="alarm-condition">${displayCondition}</span>
                                 </div>
                                 ${alarm.label ? `<div class="alarm-label">${alarm.label}</div>` : ''}
                                 <div class="alarm-details">${formatDays(alarm.repeat)}</div>
@@ -411,7 +430,7 @@
                             </label>
                         </div>
                     </div>
-                `).join('');
+                `}).join('');
             }
         }
 
@@ -419,7 +438,6 @@
         function formatDays(daysArray) {
             if (daysArray.includes("Never")) return "Once";
             if (daysArray.length === 7) return "Daily";
-            // Abbreviate if list is long
             return daysArray.map(d => d.slice(0, 3)).join(", ");
         }
 
@@ -469,6 +487,7 @@
             selectedDays = ["Never"];
             updateRepeatUI();
             document.getElementById('new-label').value = "";
+            document.getElementById('new-aqi-op').value = "gt"; // Default to Above
             document.getElementById('repeat-wrapper').classList.remove('open');
             document.getElementById('add-modal').style.display = 'flex';
         }
@@ -477,30 +496,23 @@
             document.getElementById('add-modal').style.display = 'none';
         }
 
-        // Toggle dropdown open/close
         function toggleRepeatDropdown() {
             document.getElementById('repeat-wrapper').classList.toggle('open');
         }
 
-        // Handle day selection logic
         function selectRepeat(value) {
             if (value === "Never") {
                 selectedDays = ["Never"];
             } else {
-                // If "Never" is currently selected, remove it
                 if (selectedDays.includes("Never")) {
                     selectedDays = [];
                 }
-
-                // Toggle the clicked day
                 const idx = selectedDays.indexOf(value);
                 if (idx > -1) {
                     selectedDays.splice(idx, 1);
                 } else {
                     selectedDays.push(value);
                 }
-
-                // If no days left, revert to "Never"
                 if (selectedDays.length === 0) {
                     selectedDays = ["Never"];
                 }
@@ -510,8 +522,6 @@
 
         function updateRepeatUI() {
             const options = document.querySelectorAll('.custom-option');
-            
-            // Update visual selection
             options.forEach(opt => {
                 if (selectedDays.includes(opt.getAttribute('data-value'))) {
                     opt.classList.add('selected');
@@ -520,12 +530,10 @@
                 }
             });
 
-            // Update trigger text
             const textSpan = document.getElementById('repeat-text');
             if (selectedDays.includes("Never")) {
                 textSpan.innerText = "Never";
             } else {
-                // Sort days
                 const dayOrder = ["Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays", "Sundays"];
                 selectedDays.sort((a, b) => dayOrder.indexOf(a) - dayOrder.indexOf(b));
                 textSpan.innerText = selectedDays.map(d => d.slice(0, 3)).join(", ");
@@ -536,14 +544,18 @@
             const timeVal = document.getElementById('new-time').value;
             const labelVal = document.getElementById('new-label').value;
             const aqiVal = document.getElementById('new-aqi').value;
+            const aqiOp = document.getElementById('new-aqi-op').value; // Get Operator
             const soundVal = document.getElementById('new-sound').value;
 
-            // Use the global selectedDays array
+            // NEW DATA STRUCTURE: Conditions Array
             alarms.push({ 
                 time: timeVal,
                 label: labelVal,
-                aqiLimit: aqiVal, 
-                repeat: [...selectedDays], // Store copy of array
+                // Instead of 'aqiLimit', we store a conditions list
+                conditions: [
+                    { metric: 'aqi', operator: aqiOp, value: aqiVal }
+                ],
+                repeat: [...selectedDays], 
                 sound: capitalize(soundVal)
             });
 
