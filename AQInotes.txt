@@ -1,7 +1,0 @@
-wake up based on:
-- AQI threshold
-- AQI trend
-- AQI forecast
-- Weather (can do real weather?)
-
-JR use case: got ready for ride not realizing AQI was shit. Solution: setting an alarm that goes off if the AQI exceeds a threshold within a defined time period?
