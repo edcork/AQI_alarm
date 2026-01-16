@@ -17,6 +17,8 @@
             --danger-color: #FF453A;
             --success-color: #30D158;
             --aqi-moderate: #FFD60A;
+            --aqi-unhealthy: #FF9500;
+            --aqi-good: #30D158;
             --input-bg: #2C2C2E;
             --separator-color: #3A3A3C;
         }
@@ -41,46 +43,76 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            z-index: 10;
+            z-index: 20;
+            pointer-events: none; /* Let clicks pass through to dashboard */
         }
+        .header button { pointer-events: auto; } /* Re-enable buttons */
 
         .icon-btn {
             background: none; border: none; color: var(--accent-color);
             font-size: 24px; cursor: pointer; padding: 10px;
         }
 
-        /* --- TOP AREA: AQI DASHBOARD --- */
+        /* --- TOP AREA: DASHBOARD --- */
         #aqi-area {
             flex: 3.5;
+            position: relative;
+            background: linear-gradient(180deg, #1c1c1e 0%, #000000 100%);
+            border-bottom: 1px solid #333;
+            overflow: hidden;
+        }
+
+        /* The sliding container for locations */
+        #dashboard-slider {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        .dashboard-slide {
+            min-width: 100%;
+            height: 100%;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             text-align: center;
-            padding: 60px 20px 20px;
-            background: linear-gradient(180deg, #1c1c1e 0%, #000000 100%);
-            border-bottom: 1px solid #333;
+            padding-top: 40px; /* Space for header */
+            box-sizing: border-box;
         }
 
-        .aqi-location { font-size: 18px; font-weight: 500; margin-bottom: 5px; }
-        
+        .aqi-location-row {
+            display: flex; align-items: center; gap: 6px;
+            margin-bottom: 5px;
+        }
+        .aqi-location { font-size: 18px; font-weight: 500; }
+        .location-icon { width: 16px; height: 16px; fill: var(--text-secondary); }
+
         .aqi-value {
             font-size: 80px; font-weight: 700; line-height: 1; margin: 10px 0;
-            color: var(--aqi-moderate);
         }
 
         .aqi-status {
-            font-size: 24px; font-weight: 500; color: var(--aqi-moderate); margin-bottom: 15px;
+            font-size: 24px; font-weight: 500; margin-bottom: 15px;
         }
 
-        /* AQI Details on same line */
         .aqi-details {
-            display: flex; 
-            flex-direction: row; 
-            gap: 15px; 
-            font-size: 13px; 
-            color: var(--text-secondary);
+            display: flex; flex-direction: row; gap: 15px; 
+            font-size: 13px; color: var(--text-secondary);
         }
+
+        /* Indicators dots */
+        .pagination-dots {
+            position: absolute; bottom: 15px; left: 0; right: 0;
+            display: flex; justify-content: center; gap: 8px;
+        }
+        .dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background-color: #555; transition: background-color 0.2s;
+        }
+        .dot.active { background-color: white; }
+
 
         /* --- BOTTOM AREA: ALARMS LIST --- */
         #alarms-area {
@@ -102,61 +134,31 @@
             font-size: 16px; margin-top: 15px; cursor: pointer;
         }
 
-        /* --- SWIPEABLE ALARM ROW STYLES --- */
+        /* --- ALARM ROW --- */
         .alarm-container {
-            position: relative;
-            margin-bottom: 12px;
-            height: 90px;
-            border-radius: 16px;
-            overflow: hidden;
+            position: relative; margin-bottom: 12px; height: 90px;
+            border-radius: 16px; overflow: hidden;
         }
-
         .alarm-delete-bg {
-            position: absolute;
-            top: 0; bottom: 0; right: 0;
-            width: 100%;
+            position: absolute; top: 0; bottom: 0; right: 0; width: 100%;
             background-color: var(--danger-color);
-            display: flex;
-            justify-content: flex-end;
-            align-items: center;
-            padding-right: 25px;
-            font-weight: 600;
-            font-size: 16px;
-            color: white;
+            display: flex; justify-content: flex-end; align-items: center;
+            padding-right: 25px; font-weight: 600; font-size: 16px; color: white;
             z-index: 1;
         }
-
         .alarm-row-content {
-            position: relative;
-            background-color: var(--card-bg);
-            width: 100%;
-            height: 100%;
-            padding: 0 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            z-index: 2;
-            box-sizing: border-box;
-            transition: transform 0.2s ease-out;
+            position: relative; background-color: var(--card-bg);
+            width: 100%; height: 100%; padding: 0 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            z-index: 2; box-sizing: border-box; transition: transform 0.2s ease-out;
         }
-
         .alarm-info { display: flex; flex-direction: column; justify-content: center; }
-
-        .alarm-top-line {
-            display: flex; align-items: baseline; gap: 10px;
-        }
-
+        .alarm-top-line { display: flex; align-items: baseline; gap: 10px; }
         .alarm-time { font-size: 26px; font-weight: 400; color: var(--text-primary); }
         .alarm-condition { font-size: 26px; font-weight: 400; color: var(--text-secondary); }
-
-        .alarm-label {
-            font-size: 15px; color: var(--text-primary); font-weight: 500; margin-top: 2px;
-        }
-        .alarm-details {
-            font-size: 13px; color: var(--text-secondary); margin-top: 2px;
-        }
-
-        /* Switch */
+        .alarm-label { font-size: 15px; color: var(--text-primary); font-weight: 500; margin-top: 2px; }
+        .alarm-details { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
+        
         .switch { position: relative; display: inline-block; width: 50px; height: 30px; flex-shrink: 0;}
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider {
@@ -171,115 +173,92 @@
         input:checked + .slider { background-color: var(--success-color); }
         input:checked + .slider:before { transform: translateX(20px); }
 
-        /* --- MODAL STYLES --- */
+        /* --- MODALS --- */
         .modal-overlay {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.8);
-            z-index: 100;
-            display: none;
-            align-items: flex-end;
-            justify-content: center;
+            background: rgba(0,0,0,0.8); z-index: 100;
+            display: none; align-items: flex-end; justify-content: center;
         }
+        
+        /* Action Sheet (The Add Menu) */
+        .action-sheet {
+            background-color: var(--card-bg); width: 95%; max-width: 400px;
+            border-radius: 14px; margin-bottom: 20px; overflow: hidden;
+            animation: slideUp 0.2s ease-out;
+        }
+        .action-btn {
+            width: 100%; padding: 18px; background: none; border: none;
+            border-bottom: 1px solid var(--separator-color);
+            color: var(--accent-color); font-size: 18px; cursor: pointer;
+        }
+        .action-btn:last-child { border-bottom: none; }
+        .action-cancel {
+            margin-top: 10px; background-color: var(--card-bg);
+            border-radius: 14px; font-weight: 600; color: var(--danger-color);
+        }
+
+        /* Full Modals (Add Alarm, Add Location) */
         .modal-content {
-            background-color: var(--card-bg);
-            width: 100%; max-width: 600px;
+            background-color: var(--card-bg); width: 100%; max-width: 600px;
             border-top-left-radius: 20px; border-top-right-radius: 20px;
             padding: 25px; box-sizing: border-box;
-            animation: slideUp 0.3s ease-out;
-            max-height: 90vh;
-            overflow-y: auto;
+            animation: slideUp 0.3s ease-out; max-height: 90vh; overflow-y: auto;
         }
+        /* Full Screen Modal for Search */
+        .modal-full-screen {
+            background-color: var(--bg-color); width: 100%; height: 100%;
+            display: flex; flex-direction: column;
+            animation: slideUp 0.3s ease-out;
+            padding: 20px; box-sizing: border-box;
+        }
+
         @keyframes slideUp {
             from { transform: translateY(100%); }
             to { transform: translateY(0); }
         }
-        .modal-header {
-            font-size: 20px; font-weight: 700; margin-bottom: 20px; text-align: center;
-        }
+
+        .modal-header { font-size: 20px; font-weight: 700; margin-bottom: 20px; text-align: center; }
         .form-group { margin-bottom: 15px; }
         .form-label { display: block; font-size: 14px; color: var(--text-secondary); margin-bottom: 8px; }
         
         .form-input, .form-select {
-            width: 100%;
-            background-color: var(--input-bg);
-            color: white;
+            width: 100%; background-color: var(--input-bg); color: white;
             border: none; padding: 12px; border-radius: 10px;
             font-size: 16px; box-sizing: border-box;
             appearance: none; -webkit-appearance: none;
         }
         .form-select {
             background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%230A84FF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
-            background-repeat: no-repeat;
-            background-position: right 15px top 50%;
+            background-repeat: no-repeat; background-position: right 15px top 50%;
             background-size: 12px auto;
         }
 
-        /* Combined Input Group for Logic */
-        .input-group-row {
-            display: flex; gap: 10px;
-        }
+        .input-group-row { display: flex; gap: 10px; }
         .input-group-row .form-select { flex: 1; }
         .input-group-row .form-input { flex: 1; }
 
-        /* CUSTOM MULTI-SELECT STYLES */
-        .custom-select-wrapper {
-            background-color: var(--input-bg);
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        .custom-select-trigger {
-            padding: 12px;
-            font-size: 16px;
-            color: var(--text-primary);
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .custom-select-trigger::after {
-            content: '';
-            width: 12px; height: 12px;
-            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%230A84FF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
-            background-repeat: no-repeat;
-            background-size: contain;
-            transition: transform 0.2s;
-        }
-        .custom-select-wrapper.open .custom-select-trigger::after {
-            transform: rotate(180deg);
-        }
-        .custom-options {
-            display: none;
-            border-top: 1px solid var(--separator-color);
-        }
-        .custom-select-wrapper.open .custom-options {
-            display: block;
-        }
-        .custom-option {
-            padding: 12px 15px;
-            border-bottom: 1px solid var(--separator-color);
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 15px;
-        }
+        /* Custom Dropdown Styles (Same as before) */
+        .custom-select-wrapper { background-color: var(--input-bg); border-radius: 10px; overflow: hidden; }
+        .custom-select-trigger { padding: 12px; font-size: 16px; color: var(--text-primary); cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .custom-select-trigger::after { content: ''; width: 12px; height: 12px; background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%230A84FF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E"); background-repeat: no-repeat; background-size: contain; transition: transform 0.2s; }
+        .custom-select-wrapper.open .custom-select-trigger::after { transform: rotate(180deg); }
+        .custom-options { display: none; border-top: 1px solid var(--separator-color); }
+        .custom-select-wrapper.open .custom-options { display: block; }
+        .custom-option { padding: 12px 15px; border-bottom: 1px solid var(--separator-color); cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 15px; }
         .custom-option:last-child { border-bottom: none; }
-        .custom-option.selected {
-            color: var(--accent-color);
-            background-color: rgba(10, 132, 255, 0.1);
-        }
-        .custom-option.selected::after {
-            content: '✓';
-            font-weight: bold;
-        }
-
+        .custom-option.selected { color: var(--accent-color); background-color: rgba(10, 132, 255, 0.1); }
+        .custom-option.selected::after { content: '✓'; font-weight: bold; }
 
         .modal-actions { display: flex; gap: 15px; margin-top: 25px; }
-        .btn-modal {
-            flex: 1; padding: 15px; border-radius: 12px; font-size: 16px; font-weight: 600; border: none; cursor: pointer;
-        }
+        .btn-modal { flex: 1; padding: 15px; border-radius: 12px; font-size: 16px; font-weight: 600; border: none; cursor: pointer; }
         .btn-cancel { background-color: #333; color: white; }
         .btn-save { background-color: var(--accent-color); color: white; }
+
+        /* Search Results for Location */
+        .search-results { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
+        .search-item { background-color: var(--card-bg); padding: 15px; border-radius: 10px; cursor: pointer; }
+        .search-item-city { font-size: 16px; font-weight: 600; }
+        .search-item-country { font-size: 13px; color: var(--text-secondary); }
 
     </style>
 </head>
@@ -292,7 +271,7 @@
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
             </svg>
         </button>
-        <button class="icon-btn" onclick="openAddAlarm()">
+        <button class="icon-btn" onclick="openAddMenu()">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="12" y1="5" x2="12" y2="19"></line>
                 <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -301,42 +280,40 @@
     </div>
 
     <section id="aqi-area">
-        <div class="aqi-location">Shanghai</div>
-        <div class="aqi-value">85</div>
-        <div class="aqi-status">Moderate</div>
-        <div class="aqi-details">
-            <span>Major pollutant: PM2.5</span>
-            <span>•</span>
-            <span>Last updated: 10:45 AM</span>
-        </div>
+        <div id="dashboard-slider">
+            </div>
+        <div class="pagination-dots" id="dots-container">
+            </div>
     </section>
 
     <section id="alarms-area">
         <div class="section-title">Alarms</div>
-
         <div id="empty-state" class="empty-state">
             <p>No alarms configured</p>
-            <button class="btn-add-alarm-large" onclick="openAddAlarm()">+ Add Alarm</button>
+            <button class="btn-add-alarm-large" onclick="openAddMenu()">+ Add</button>
         </div>
-
-        <div id="alarm-list-container" class="alarm-list" style="display: none;">
-            </div>
+        <div id="alarm-list-container" class="alarm-list" style="display: none;"></div>
     </section>
+
+    <div id="menu-modal" class="modal-overlay" style="align-items: flex-end;">
+        <div class="action-sheet">
+            <button class="action-btn" onclick="selectMenuOption('alarm')">Add Alarm</button>
+            <button class="action-btn" onclick="selectMenuOption('location')">Add Location</button>
+        </div>
+        <button class="action-cancel" style="width: 95%; max-width: 400px; padding: 18px; margin-bottom: 20px; border: none; font-size: 18px; cursor: pointer;" onclick="closeAddMenu()">Cancel</button>
+    </div>
 
     <div id="add-modal" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">New Alarm</div>
-            
             <div class="form-group">
                 <label class="form-label">Time</label>
                 <input type="time" id="new-time" class="form-input" value="07:00">
             </div>
-
             <div class="form-group">
                 <label class="form-label">Label</label>
                 <input type="text" id="new-label" class="form-input" placeholder="e.g. Morning Run">
             </div>
-
             <div class="form-group">
                 <label class="form-label">AQI Threshold</label>
                 <div class="input-group-row">
@@ -347,15 +324,11 @@
                     <input type="number" id="new-aqi" class="form-input" value="100" placeholder="150">
                 </div>
             </div>
-
             <div class="form-group">
                 <label class="form-label">Location of reading</label>
-                <select id="new-location" class="form-select">
-                    <option value="Shanghai" selected>Shanghai</option>
-                    <option value="Current Location">Current Location</option>
-                </select>
+                <select id="new-location-select" class="form-select">
+                    </select>
             </div>
-
             <div class="form-group">
                 <label class="form-label">Repeat</label>
                 <div class="custom-select-wrapper" id="repeat-wrapper">
@@ -374,7 +347,6 @@
                     </div>
                 </div>
             </div>
-
             <div class="form-group">
                 <label class="form-label">Sound</label>
                 <select id="new-sound" class="form-select">
@@ -384,7 +356,6 @@
                     <option value="siren">Siren</option>
                 </select>
             </div>
-
             <div class="modal-actions">
                 <button class="btn-modal btn-cancel" onclick="closeAddAlarm()">Cancel</button>
                 <button class="btn-modal btn-save" onclick="saveAlarm()">Save</button>
@@ -392,10 +363,102 @@
         </div>
     </div>
 
+    <div id="location-modal" class="modal-overlay">
+        <div class="modal-full-screen">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <button style="background:none; border:none; color: var(--accent-color); font-size: 16px;" onclick="closeLocationSearch()">Cancel</button>
+                <span style="font-weight: 700; font-size: 18px;">Add Location</span>
+                <div style="width: 50px;"></div> </div>
+            
+            <input type="text" id="loc-search-input" class="form-input" placeholder="Search for a city..." onkeyup="handleSearch(event)">
+            
+            <div id="search-results" class="search-results">
+                </div>
+        </div>
+    </div>
+
     <script>
+        // --- DATA & STATE ---
         let alarms = []; 
         let selectedDays = ["Never"];
+        
+        // Demo Data Locations
+        let locations = [
+            { name: "Shanghai", aqi: 85, status: "Moderate", pollutant: "PM2.5", time: "10:45 AM", isCurrent: true, color: "var(--aqi-moderate)" },
+            { name: "Hangzhou", aqi: 155, status: "Unhealthy", pollutant: "PM2.5", time: "10:45 AM", isCurrent: false, color: "var(--aqi-unhealthy)" },
+            { name: "Suzhou", aqi: 42, status: "Good", pollutant: "PM10", time: "10:45 AM", isCurrent: false, color: "var(--aqi-good)" }
+        ];
+        let currentLocIndex = 0;
 
+        // --- DASHBOARD RENDER & SWIPE ---
+        function renderDashboard() {
+            const slider = document.getElementById('dashboard-slider');
+            const dots = document.getElementById('dots-container');
+            
+            // Build Slides
+            slider.innerHTML = locations.map(loc => {
+                const iconHtml = loc.isCurrent 
+                    ? `<svg class="location-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"></path></svg>` 
+                    : '';
+                
+                return `
+                <div class="dashboard-slide">
+                    <div class="aqi-location-row">
+                        ${iconHtml}
+                        <div class="aqi-location">${loc.name}</div>
+                    </div>
+                    <div class="aqi-value" style="color: ${loc.color}">${loc.aqi}</div>
+                    <div class="aqi-status" style="color: ${loc.color}">${loc.status}</div>
+                    <div class="aqi-details">
+                        <span>Major pollutant: ${loc.pollutant}</span>
+                        <span>•</span>
+                        <span>Last updated: ${loc.time}</span>
+                    </div>
+                </div>
+            `}).join('');
+
+            // Build Dots
+            dots.innerHTML = locations.map((_, i) => 
+                `<div class="dot ${i === currentLocIndex ? 'active' : ''}"></div>`
+            ).join('');
+
+            // Apply Transform
+            slider.style.transform = `translateX(-${currentLocIndex * 100}%)`;
+
+            // Update Alarm Modal "Location" Dropdown
+            updateLocationDropdown();
+        }
+
+        // Dashboard Swipe Logic
+        const dashArea = document.getElementById('aqi-area');
+        let dashStartX = 0;
+
+        dashArea.addEventListener('touchstart', (e) => {
+            dashStartX = e.touches[0].clientX;
+        });
+
+        dashArea.addEventListener('touchend', (e) => {
+            const endX = e.changedTouches[0].clientX;
+            const diff = endX - dashStartX;
+
+            if (diff > 50) {
+                // Swipe Right -> Prev
+                if (currentLocIndex > 0) currentLocIndex--;
+            } else if (diff < -50) {
+                // Swipe Left -> Next
+                if (currentLocIndex < locations.length - 1) currentLocIndex++;
+            }
+            renderDashboard();
+        });
+
+        function updateLocationDropdown() {
+            const select = document.getElementById('new-location-select');
+            select.innerHTML = `<option value="Current Location">Current Location</option>` + 
+                locations.filter(l => !l.isCurrent).map(l => `<option value="${l.name}">${l.name}</option>`).join('');
+        }
+
+
+        // --- ALARM LIST RENDER ---
         function renderAlarms() {
             const emptyState = document.getElementById('empty-state');
             const listContainer = document.getElementById('alarm-list-container');
@@ -408,7 +471,6 @@
                 listContainer.style.display = 'block';
 
                 listContainer.innerHTML = alarms.map((alarm, index) => {
-                    // Logic to format the condition text
                     const mainCondition = alarm.conditions[0];
                     const opSymbol = mainCondition.operator === 'gt' ? '>' : '<';
                     const displayCondition = `AQI ${opSymbol} ${mainCondition.value}`;
@@ -416,7 +478,6 @@
                     return `
                     <div class="alarm-container">
                         <div class="alarm-delete-bg" onclick="deleteAlarm(${index})">Delete</div>
-                        
                         <div class="alarm-row-content" 
                              id="row-${index}"
                              ontouchstart="handleTouchStart(event, ${index})"
@@ -429,153 +490,160 @@
                                     <span class="alarm-condition">${displayCondition}</span>
                                 </div>
                                 ${alarm.label ? `<div class="alarm-label">${alarm.label}</div>` : ''}
-                                <div class="alarm-details">${formatDays(alarm.repeat)}</div>
+                                <div class="alarm-details">${alarm.location} • ${formatDays(alarm.repeat)}</div>
                             </div>
-                            
-                            <label class="switch">
-                                <input type="checkbox" checked>
-                                <span class="slider"></span>
-                            </label>
+                            <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
                         </div>
                     </div>
                 `}).join('');
             }
         }
 
-        // Helper to display days nicely
+        // Swipe List Logic (Reused)
+        let listStartX = 0;
+        let currentSwipeIndex = -1;
+        function handleTouchStart(e, index) { listStartX = e.touches[0].clientX; currentSwipeIndex = index; }
+        function handleTouchMove(e, index) {
+            if (currentSwipeIndex !== index) return;
+            const diff = e.touches[0].clientX - listStartX;
+            const row = document.getElementById(`row-${index}`);
+            if (diff < 0 && diff > -100) row.style.transform = `translateX(${diff}px)`;
+        }
+        function handleTouchEnd(e, index) {
+            const row = document.getElementById(`row-${index}`);
+            const diff = e.changedTouches[0].clientX - listStartX;
+            row.style.transform = diff < -80 ? `translateX(-100px)` : `translateX(0px)`;
+        }
+        function deleteAlarm(index) { alarms.splice(index, 1); renderAlarms(); }
+
+        // Helper
         function formatDays(daysArray) {
             if (daysArray.includes("Never")) return "Once";
             if (daysArray.length === 7) return "Daily";
             return daysArray.map(d => d.slice(0, 3)).join(", ");
         }
 
-        // --- SWIPE LOGIC ---
-        let startX = 0;
-        let currentSwipeIndex = -1;
-
-        function handleTouchStart(e, index) {
-            startX = e.touches[0].clientX;
-            currentSwipeIndex = index;
-        }
-
-        function handleTouchMove(e, index) {
-            if (currentSwipeIndex !== index) return;
-            
-            const currentX = e.touches[0].clientX;
-            const diff = currentX - startX;
-            const row = document.getElementById(`row-${index}`);
-
-            if (diff < 0 && diff > -100) {
-                row.style.transform = `translateX(${diff}px)`;
-            }
-        }
-
-        function handleTouchEnd(e, index) {
-            const row = document.getElementById(`row-${index}`);
-            const endX = e.changedTouches[0].clientX;
-            const diff = endX - startX;
-
-            if (diff < -80) {
-                row.style.transform = `translateX(-100px)`;
-            } else {
-                row.style.transform = `translateX(0px)`;
-            }
-        }
-
-        function deleteAlarm(index) {
-            alarms.splice(index, 1);
-            renderAlarms();
-        }
-
-        // --- MODAL & REPEAT LOGIC ---
+        // --- MENUS & MODALS LOGIC ---
         function openSettings() { alert("Settings"); }
 
+        function openAddMenu() {
+            document.getElementById('menu-modal').style.display = 'flex';
+        }
+        function closeAddMenu() {
+            document.getElementById('menu-modal').style.display = 'none';
+        }
+
+        function selectMenuOption(option) {
+            closeAddMenu();
+            if (option === 'alarm') openAddAlarm();
+            if (option === 'location') openLocationSearch();
+        }
+
+        // Add Alarm Logic
         function openAddAlarm() {
-            // Reset state
-            selectedDays = ["Never"];
-            updateRepeatUI();
+            selectedDays = ["Never"]; updateRepeatUI();
             document.getElementById('new-label').value = "";
-            document.getElementById('new-aqi-op').value = "lt"; // Default to Below
-            document.getElementById('new-location').value = "Shanghai"; // Reset location
+            document.getElementById('new-aqi-op').value = "lt"; 
             document.getElementById('repeat-wrapper').classList.remove('open');
             document.getElementById('add-modal').style.display = 'flex';
         }
+        function closeAddAlarm() { document.getElementById('add-modal').style.display = 'none'; }
 
-        function closeAddAlarm() {
-            document.getElementById('add-modal').style.display = 'none';
+        // Add Location Logic
+        function openLocationSearch() {
+            document.getElementById('loc-search-input').value = "";
+            document.getElementById('search-results').innerHTML = "";
+            document.getElementById('location-modal').style.display = 'flex';
         }
-
-        function toggleRepeatDropdown() {
-            document.getElementById('repeat-wrapper').classList.toggle('open');
-        }
-
-        function selectRepeat(value) {
-            if (value === "Never") {
-                selectedDays = ["Never"];
+        function closeLocationSearch() { document.getElementById('location-modal').style.display = 'none'; }
+        
+        function handleSearch(e) {
+            const val = e.target.value;
+            const resultsDiv = document.getElementById('search-results');
+            if (val.length > 2) {
+                // Mock Results
+                resultsDiv.innerHTML = `
+                    <div class="search-item" onclick="addLocation('Beijing')">
+                        <div class="search-item-city">Beijing</div>
+                        <div class="search-item-country">China</div>
+                    </div>
+                    <div class="search-item" onclick="addLocation('Tokyo')">
+                        <div class="search-item-city">Tokyo</div>
+                        <div class="search-item-country">Japan</div>
+                    </div>
+                `;
             } else {
-                if (selectedDays.includes("Never")) {
-                    selectedDays = [];
-                }
-                const idx = selectedDays.indexOf(value);
-                if (idx > -1) {
-                    selectedDays.splice(idx, 1);
-                } else {
-                    selectedDays.push(value);
-                }
-                if (selectedDays.length === 0) {
-                    selectedDays = ["Never"];
-                }
+                resultsDiv.innerHTML = "";
             }
-            updateRepeatUI();
         }
 
-        function updateRepeatUI() {
-            const options = document.querySelectorAll('.custom-option');
-            options.forEach(opt => {
-                if (selectedDays.includes(opt.getAttribute('data-value'))) {
-                    opt.classList.add('selected');
-                } else {
-                    opt.classList.remove('selected');
-                }
+        function addLocation(name) {
+            // Add new mock location
+            locations.push({ 
+                name: name, 
+                aqi: Math.floor(Math.random() * 100), 
+                status: "Good", 
+                pollutant: "PM2.5", 
+                time: "Now", 
+                isCurrent: false, 
+                color: "var(--aqi-good)" 
             });
-
-            const textSpan = document.getElementById('repeat-text');
-            if (selectedDays.includes("Never")) {
-                textSpan.innerText = "Never";
-            } else {
-                const dayOrder = ["Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays", "Sundays"];
-                selectedDays.sort((a, b) => dayOrder.indexOf(a) - dayOrder.indexOf(b));
-                textSpan.innerText = selectedDays.map(d => d.slice(0, 3)).join(", ");
-            }
+            currentLocIndex = locations.length - 1; // Jump to new location
+            renderDashboard();
+            closeLocationSearch();
         }
 
+        // Save Alarm
         function saveAlarm() {
             const timeVal = document.getElementById('new-time').value;
             const labelVal = document.getElementById('new-label').value;
             const aqiVal = document.getElementById('new-aqi').value;
             const aqiOp = document.getElementById('new-aqi-op').value; 
-            const locVal = document.getElementById('new-location').value; // Capture Location
+            const locVal = document.getElementById('new-location-select').value;
             const soundVal = document.getElementById('new-sound').value;
 
             alarms.push({ 
                 time: timeVal,
                 label: labelVal,
-                location: locVal, // Store Location
-                conditions: [
-                    { metric: 'aqi', operator: aqiOp, value: aqiVal }
-                ],
+                location: locVal,
+                conditions: [{ metric: 'aqi', operator: aqiOp, value: aqiVal }],
                 repeat: [...selectedDays], 
-                sound: capitalize(soundVal)
+                sound: soundVal // kept raw for logic, capitalized in UI if needed
             });
 
             renderAlarms();
             closeAddAlarm();
         }
 
-        function capitalize(s) {
-            return s && s[0].toUpperCase() + s.slice(1);
+        // Toggle Repeat
+        function toggleRepeatDropdown() { document.getElementById('repeat-wrapper').classList.toggle('open'); }
+        function selectRepeat(value) {
+            if (value === "Never") selectedDays = ["Never"];
+            else {
+                if (selectedDays.includes("Never")) selectedDays = [];
+                const idx = selectedDays.indexOf(value);
+                if (idx > -1) selectedDays.splice(idx, 1);
+                else selectedDays.push(value);
+                if (selectedDays.length === 0) selectedDays = ["Never"];
+            }
+            updateRepeatUI();
+        }
+        function updateRepeatUI() {
+            document.querySelectorAll('.custom-option').forEach(opt => {
+                if (selectedDays.includes(opt.getAttribute('data-value'))) opt.classList.add('selected');
+                else opt.classList.remove('selected');
+            });
+            const textSpan = document.getElementById('repeat-text');
+            if (selectedDays.includes("Never")) textSpan.innerText = "Never";
+            else {
+                const dayOrder = ["Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays", "Sundays"];
+                selectedDays.sort((a, b) => dayOrder.indexOf(a) - dayOrder.indexOf(b));
+                textSpan.innerText = selectedDays.map(d => d.slice(0, 3)).join(", ");
+            }
         }
 
+        // Init
+        renderDashboard();
         renderAlarms();
     </script>
 </body>
