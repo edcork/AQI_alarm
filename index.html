@@ -44,9 +44,9 @@
             justify-content: space-between;
             align-items: center;
             z-index: 20;
-            pointer-events: none; /* Let clicks pass through to dashboard */
+            pointer-events: none;
         }
-        .header button { pointer-events: auto; } /* Re-enable buttons */
+        .header button { pointer-events: auto; }
 
         .icon-btn {
             background: none; border: none; color: var(--accent-color);
@@ -62,48 +62,26 @@
             overflow: hidden;
         }
 
-        /* The sliding container for locations */
         #dashboard-slider {
-            display: flex;
-            width: 100%;
-            height: 100%;
+            display: flex; width: 100%; height: 100%;
             transition: transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
         }
 
         .dashboard-slide {
-            min-width: 100%;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            padding-top: 40px; /* Space for header */
-            box-sizing: border-box;
+            min-width: 100%; height: 100%;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            text-align: center; padding-top: 40px; box-sizing: border-box;
         }
 
-        .aqi-location-row {
-            display: flex; align-items: center; gap: 6px;
-            margin-bottom: 5px;
-        }
+        .aqi-location-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
         .aqi-location { font-size: 18px; font-weight: 500; }
         .location-icon { width: 16px; height: 16px; fill: var(--text-secondary); }
 
-        .aqi-value {
-            font-size: 80px; font-weight: 700; line-height: 1; margin: 10px 0;
-        }
+        .aqi-value { font-size: 80px; font-weight: 700; line-height: 1; margin: 10px 0; }
+        .aqi-status { font-size: 24px; font-weight: 500; margin-bottom: 15px; }
+        .aqi-details { display: flex; flex-direction: row; gap: 15px; font-size: 13px; color: var(--text-secondary); margin-bottom: 30px; }
 
-        .aqi-status {
-            font-size: 24px; font-weight: 500; margin-bottom: 15px;
-        }
-
-        .aqi-details {
-            display: flex; flex-direction: row; gap: 15px; 
-            font-size: 13px; color: var(--text-secondary);
-            margin-bottom: 30px; /* ADDED: Pushes text up away from the dots */
-        }
-
-        /* Indicators dots */
         .pagination-dots {
             position: absolute; bottom: 15px; left: 0; right: 0;
             display: flex; justify-content: center; gap: 8px;
@@ -114,12 +92,10 @@
         }
         .dot.active { background-color: white; }
 
-
         /* --- BOTTOM AREA: ALARMS LIST --- */
         #alarms-area {
             flex: 6.5; padding: 20px; overflow-y: auto;
-            display: flex; flex-direction: column;
-            overflow-x: hidden;
+            display: flex; flex-direction: column; overflow-x: hidden;
         }
 
         .section-title { font-size: 28px; font-weight: 700; margin-bottom: 20px; padding-left: 5px; }
@@ -136,22 +112,16 @@
         }
 
         /* --- ALARM ROW --- */
-        .alarm-container {
-            position: relative; margin-bottom: 12px; height: 90px;
-            border-radius: 16px; overflow: hidden;
-        }
+        .alarm-container { position: relative; margin-bottom: 12px; height: 90px; border-radius: 16px; overflow: hidden; }
         .alarm-delete-bg {
             position: absolute; top: 0; bottom: 0; right: 0; width: 100%;
-            background-color: var(--danger-color);
-            display: flex; justify-content: flex-end; align-items: center;
-            padding-right: 25px; font-weight: 600; font-size: 16px; color: white;
-            z-index: 1;
+            background-color: var(--danger-color); display: flex; justify-content: flex-end; align-items: center;
+            padding-right: 25px; font-weight: 600; font-size: 16px; color: white; z-index: 1;
         }
         .alarm-row-content {
-            position: relative; background-color: var(--card-bg);
-            width: 100%; height: 100%; padding: 0 20px;
-            display: flex; justify-content: space-between; align-items: center;
-            z-index: 2; box-sizing: border-box; transition: transform 0.2s ease-out;
+            position: relative; background-color: var(--card-bg); width: 100%; height: 100%; padding: 0 20px;
+            display: flex; justify-content: space-between; align-items: center; z-index: 2;
+            box-sizing: border-box; transition: transform 0.2s ease-out;
         }
         .alarm-info { display: flex; flex-direction: column; justify-content: center; }
         .alarm-top-line { display: flex; align-items: baseline; gap: 10px; }
@@ -167,95 +137,65 @@
             background-color: #3a3a3c; transition: .4s; border-radius: 34px;
         }
         .slider:before {
-            position: absolute; content: ""; height: 26px; width: 26px;
-            left: 2px; bottom: 2px; background-color: white;
-            transition: .4s; border-radius: 50%;
+            position: absolute; content: ""; height: 26px; width: 26px; left: 2px; bottom: 2px;
+            background-color: white; transition: .4s; border-radius: 50%;
         }
         input:checked + .slider { background-color: var(--success-color); }
         input:checked + .slider:before { transform: translateX(20px); }
 
-        /* --- MODALS --- */
+        /* --- MENUS & MODALS --- */
         .modal-overlay {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0,0,0,0.8); z-index: 100;
             display: none; align-items: flex-end; justify-content: center;
         }
-        
-        /* NEW: Top Right Action Menu */
         .menu-overlay {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.5); z-index: 100;
-            display: none; /* Hidden by default */
+            background: rgba(0,0,0,0.5); z-index: 100; display: none;
         }
-
         .action-menu {
-            position: absolute;
-            top: 70px; /* Below the header icon */
-            right: 20px;
-            width: 200px;
-            background-color: var(--card-bg);
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
-            display: flex; flex-direction: column;
-            animation: fadeIn 0.2s ease-out;
-            z-index: 101;
+            position: absolute; top: 70px; right: 20px; width: 200px;
+            background-color: var(--card-bg); border-radius: 12px; overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6); display: flex; flex-direction: column;
+            animation: fadeIn 0.2s ease-out; z-index: 101;
         }
-
         .action-btn {
             width: 100%; padding: 15px 20px; background: none; border: none;
-            border-bottom: 1px solid var(--separator-color);
-            color: var(--accent-color); font-size: 16px; cursor: pointer;
-            text-align: left;
+            border-bottom: 1px solid var(--separator-color); color: var(--accent-color);
+            font-size: 16px; cursor: pointer; text-align: left;
         }
         .action-btn:last-child { border-bottom: none; }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
-        }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
 
-        /* Full Modals (Add Alarm, Add Location) */
         .modal-content {
             background-color: var(--card-bg); width: 100%; max-width: 600px;
             border-top-left-radius: 20px; border-top-right-radius: 20px;
-            padding: 25px; box-sizing: border-box;
-            animation: slideUp 0.3s ease-out; max-height: 90vh; overflow-y: auto;
+            padding: 25px; box-sizing: border-box; animation: slideUp 0.3s ease-out;
+            max-height: 90vh; overflow-y: auto;
         }
-        /* Full Screen Modal for Search */
         .modal-full-screen {
             background-color: var(--bg-color); width: 100%; height: 100%;
-            display: flex; flex-direction: column;
-            animation: slideUp 0.3s ease-out;
-            padding: 20px; box-sizing: border-box;
+            display: flex; flex-direction: column; animation: slideUp 0.3s ease-out;
+            padding: 20px; box-sizing: border-box; overflow-y: auto;
         }
-
-        @keyframes slideUp {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
-        }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
         .modal-header { font-size: 20px; font-weight: 700; margin-bottom: 20px; text-align: center; }
         .form-group { margin-bottom: 15px; }
         .form-label { display: block; font-size: 14px; color: var(--text-secondary); margin-bottom: 8px; }
-        
         .form-input, .form-select {
             width: 100%; background-color: var(--input-bg); color: white;
             border: none; padding: 12px; border-radius: 10px;
-            font-size: 16px; box-sizing: border-box;
-            appearance: none; -webkit-appearance: none;
+            font-size: 16px; box-sizing: border-box; appearance: none; -webkit-appearance: none;
         }
         .form-select {
             background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%230A84FF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
-            background-repeat: no-repeat; background-position: right 15px top 50%;
-            background-size: 12px auto;
+            background-repeat: no-repeat; background-position: right 15px top 50%; background-size: 12px auto;
         }
-
         .input-group-row { display: flex; gap: 10px; }
         .input-group-row .form-select { flex: 1; }
         .input-group-row .form-input { flex: 1; }
 
-        /* Custom Dropdown Styles (Same as before) */
         .custom-select-wrapper { background-color: var(--input-bg); border-radius: 10px; overflow: hidden; }
         .custom-select-trigger { padding: 12px; font-size: 16px; color: var(--text-primary); cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
         .custom-select-trigger::after { content: ''; width: 12px; height: 12px; background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%230A84FF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E"); background-repeat: no-repeat; background-size: contain; transition: transform 0.2s; }
@@ -263,7 +203,6 @@
         .custom-options { display: none; border-top: 1px solid var(--separator-color); }
         .custom-select-wrapper.open .custom-options { display: block; }
         .custom-option { padding: 12px 15px; border-bottom: 1px solid var(--separator-color); cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 15px; }
-        .custom-option:last-child { border-bottom: none; }
         .custom-option.selected { color: var(--accent-color); background-color: rgba(10, 132, 255, 0.1); }
         .custom-option.selected::after { content: '✓'; font-weight: bold; }
 
@@ -272,11 +211,22 @@
         .btn-cancel { background-color: #333; color: white; }
         .btn-save { background-color: var(--accent-color); color: white; }
 
-        /* Search Results for Location */
         .search-results { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
         .search-item { background-color: var(--card-bg); padding: 15px; border-radius: 10px; cursor: pointer; }
         .search-item-city { font-size: 16px; font-weight: 600; }
         .search-item-country { font-size: 13px; color: var(--text-secondary); }
+
+        /* --- SETTINGS STYLES --- */
+        .settings-section { margin-bottom: 25px; }
+        .settings-section-title { font-size: 14px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px; margin-left: 5px; }
+        .settings-list { background-color: var(--card-bg); border-radius: 12px; overflow: hidden; }
+        .settings-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 16px; border-bottom: 1px solid var(--separator-color); min-height: 24px;
+        }
+        .settings-row:last-child { border-bottom: none; }
+        .settings-label { font-size: 16px; }
+        .settings-delete-btn { color: var(--danger-color); background: none; border: none; font-size: 16px; font-weight: 500; cursor: pointer; }
 
     </style>
 </head>
@@ -298,10 +248,8 @@
     </div>
 
     <section id="aqi-area">
-        <div id="dashboard-slider">
-            </div>
-        <div class="pagination-dots" id="dots-container">
-            </div>
+        <div id="dashboard-slider"></div>
+        <div class="pagination-dots" id="dots-container"></div>
     </section>
 
     <section id="alarms-area">
@@ -317,6 +265,67 @@
         <div class="action-menu" onclick="event.stopPropagation()">
             <button class="action-btn" onclick="selectMenuOption('alarm')">Add Alarm</button>
             <button class="action-btn" onclick="selectMenuOption('location')">Add Location</button>
+        </div>
+    </div>
+
+    <div id="settings-modal" class="modal-overlay">
+        <div class="modal-full-screen">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <button style="background:none; border:none; color: var(--accent-color); font-size: 16px;" onclick="closeSettings()">Done</button>
+                <span style="font-weight: 700; font-size: 18px;">Settings</span>
+                <div style="width: 50px;"></div>
+            </div>
+
+            <div class="settings-section">
+                <div class="settings-section-title">General</div>
+                <div class="settings-list">
+                    <div class="settings-row">
+                        <span class="settings-label">AQI Standard</span>
+                        <select class="form-select" style="width: auto; padding: 5px 25px 5px 10px; height: 32px; background-position: right 5px center;">
+                            <option>US (EPA)</option>
+                            <option>CN (MEP)</option>
+                        </select>
+                    </div>
+                    <div class="settings-row">
+                        <span class="settings-label">Temperature Unit</span>
+                        <select class="form-select" style="width: auto; padding: 5px 25px 5px 10px; height: 32px; background-position: right 5px center;">
+                            <option>Celsius</option>
+                            <option>Fahrenheit</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <div class="settings-section-title">Notifications</div>
+                <div class="settings-list">
+                    <div class="settings-row">
+                        <span class="settings-label">Critical Alerts</span>
+                        <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+                    </div>
+                </div>
+                <div style="font-size: 13px; color: var(--text-secondary); margin: 5px 0 0 15px;">Sounds alarm even if Do Not Disturb is on.</div>
+            </div>
+
+            <div class="settings-section">
+                <div class="settings-section-title">Locations</div>
+                <div class="settings-list" id="settings-location-list">
+                    </div>
+            </div>
+
+             <div class="settings-section">
+                <div class="settings-section-title">Data Source</div>
+                <div class="settings-list">
+                    <div class="settings-row" style="flex-direction: column; align-items: flex-start; gap: 10px;">
+                        <span class="settings-label">API Key (WAQI)</span>
+                        <input type="text" class="form-input" placeholder="Paste key here" style="font-size: 14px; padding: 8px;">
+                    </div>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px; color: var(--text-secondary); font-size: 13px;">
+                AQI Alarm v0.4<br>Designed in Shanghai
+            </div>
         </div>
     </div>
 
@@ -343,8 +352,7 @@
             </div>
             <div class="form-group">
                 <label class="form-label">Location of reading</label>
-                <select id="new-location-select" class="form-select">
-                    </select>
+                <select id="new-location-select" class="form-select"></select>
             </div>
             <div class="form-group">
                 <label class="form-label">Repeat</label>
@@ -385,21 +393,17 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <button style="background:none; border:none; color: var(--accent-color); font-size: 16px;" onclick="closeLocationSearch()">Cancel</button>
                 <span style="font-weight: 700; font-size: 18px;">Add Location</span>
-                <div style="width: 50px;"></div> </div>
-            
+                <div style="width: 50px;"></div>
+            </div>
             <input type="text" id="loc-search-input" class="form-input" placeholder="Search for a city..." onkeyup="handleSearch(event)">
-            
-            <div id="search-results" class="search-results">
-                </div>
+            <div id="search-results" class="search-results"></div>
         </div>
     </div>
 
     <script>
-        // --- DATA & STATE ---
+        // --- DATA ---
         let alarms = []; 
         let selectedDays = ["Never"];
-        
-        // Demo Data Locations
         let locations = [
             { name: "Shanghai", aqi: 85, status: "Moderate", pollutant: "PM2.5", time: "10:45 AM", isCurrent: true, color: "var(--aqi-moderate)" },
             { name: "Hangzhou", aqi: 155, status: "Unhealthy", pollutant: "PM2.5", time: "10:45 AM", isCurrent: false, color: "var(--aqi-unhealthy)" },
@@ -407,64 +411,37 @@
         ];
         let currentLocIndex = 0;
 
-        // --- DASHBOARD RENDER & SWIPE ---
+        // --- DASHBOARD ---
         function renderDashboard() {
             const slider = document.getElementById('dashboard-slider');
             const dots = document.getElementById('dots-container');
-            
-            // Build Slides
             slider.innerHTML = locations.map(loc => {
                 const iconHtml = loc.isCurrent 
                     ? `<svg class="location-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"></path></svg>` 
                     : '';
-                
                 return `
                 <div class="dashboard-slide">
-                    <div class="aqi-location-row">
-                        ${iconHtml}
-                        <div class="aqi-location">${loc.name}</div>
-                    </div>
+                    <div class="aqi-location-row">${iconHtml}<div class="aqi-location">${loc.name}</div></div>
                     <div class="aqi-value" style="color: ${loc.color}">${loc.aqi}</div>
                     <div class="aqi-status" style="color: ${loc.color}">${loc.status}</div>
                     <div class="aqi-details">
-                        <span>Major pollutant: ${loc.pollutant}</span>
-                        <span>•</span>
-                        <span>Last updated: ${loc.time}</span>
+                        <span>Major pollutant: ${loc.pollutant}</span><span>•</span><span>Last updated: ${loc.time}</span>
                     </div>
                 </div>
             `}).join('');
-
-            // Build Dots
-            dots.innerHTML = locations.map((_, i) => 
-                `<div class="dot ${i === currentLocIndex ? 'active' : ''}"></div>`
-            ).join('');
-
-            // Apply Transform
+            dots.innerHTML = locations.map((_, i) => `<div class="dot ${i === currentLocIndex ? 'active' : ''}"></div>`).join('');
             slider.style.transform = `translateX(-${currentLocIndex * 100}%)`;
-
-            // Update Alarm Modal "Location" Dropdown
             updateLocationDropdown();
+            renderSettingsLocations(); // Update settings list too
         }
 
-        // Dashboard Swipe Logic
         const dashArea = document.getElementById('aqi-area');
         let dashStartX = 0;
-
-        dashArea.addEventListener('touchstart', (e) => {
-            dashStartX = e.touches[0].clientX;
-        });
-
+        dashArea.addEventListener('touchstart', (e) => { dashStartX = e.touches[0].clientX; });
         dashArea.addEventListener('touchend', (e) => {
-            const endX = e.changedTouches[0].clientX;
-            const diff = endX - dashStartX;
-
-            if (diff > 50) {
-                // Swipe Right -> Prev
-                if (currentLocIndex > 0) currentLocIndex--;
-            } else if (diff < -50) {
-                // Swipe Left -> Next
-                if (currentLocIndex < locations.length - 1) currentLocIndex++;
-            }
+            const diff = e.changedTouches[0].clientX - dashStartX;
+            if (diff > 50 && currentLocIndex > 0) currentLocIndex--;
+            else if (diff < -50 && currentLocIndex < locations.length - 1) currentLocIndex++;
             renderDashboard();
         });
 
@@ -474,38 +451,26 @@
                 locations.filter(l => !l.isCurrent).map(l => `<option value="${l.name}">${l.name}</option>`).join('');
         }
 
-
-        // --- ALARM LIST RENDER ---
+        // --- ALARMS ---
         function renderAlarms() {
             const emptyState = document.getElementById('empty-state');
             const listContainer = document.getElementById('alarm-list-container');
-
             if (alarms.length === 0) {
-                emptyState.style.display = 'flex';
-                listContainer.style.display = 'none';
+                emptyState.style.display = 'flex'; listContainer.style.display = 'none';
             } else {
-                emptyState.style.display = 'none';
-                listContainer.style.display = 'block';
-
+                emptyState.style.display = 'none'; listContainer.style.display = 'block';
                 listContainer.innerHTML = alarms.map((alarm, index) => {
-                    const mainCondition = alarm.conditions[0];
-                    const opSymbol = mainCondition.operator === 'gt' ? '>' : '<';
-                    const displayCondition = `AQI ${opSymbol} ${mainCondition.value}`;
-
+                    const cond = alarm.conditions[0];
+                    const op = cond.operator === 'gt' ? '>' : '<';
                     return `
                     <div class="alarm-container">
                         <div class="alarm-delete-bg" onclick="deleteAlarm(${index})">Delete</div>
-                        <div class="alarm-row-content" 
-                             id="row-${index}"
+                        <div class="alarm-row-content" id="row-${index}"
                              ontouchstart="handleTouchStart(event, ${index})"
                              ontouchmove="handleTouchMove(event, ${index})"
                              ontouchend="handleTouchEnd(event, ${index})">
-                             
                             <div class="alarm-info">
-                                <div class="alarm-top-line">
-                                    <span class="alarm-time">${alarm.time}</span>
-                                    <span class="alarm-condition">${displayCondition}</span>
-                                </div>
+                                <div class="alarm-top-line"><span class="alarm-time">${alarm.time}</span><span class="alarm-condition">AQI ${op} ${cond.value}</span></div>
                                 ${alarm.label ? `<div class="alarm-label">${alarm.label}</div>` : ''}
                                 <div class="alarm-details">${alarm.location} • ${formatDays(alarm.repeat)}</div>
                             </div>
@@ -515,10 +480,8 @@
                 `}).join('');
             }
         }
-
-        // Swipe List Logic (Reused)
-        let listStartX = 0;
-        let currentSwipeIndex = -1;
+        
+        let listStartX = 0, currentSwipeIndex = -1;
         function handleTouchStart(e, index) { listStartX = e.touches[0].clientX; currentSwipeIndex = index; }
         function handleTouchMove(e, index) {
             if (currentSwipeIndex !== index) return;
@@ -528,140 +491,110 @@
         }
         function handleTouchEnd(e, index) {
             const row = document.getElementById(`row-${index}`);
-            const diff = e.changedTouches[0].clientX - listStartX;
-            row.style.transform = diff < -80 ? `translateX(-100px)` : `translateX(0px)`;
+            row.style.transform = (e.changedTouches[0].clientX - listStartX) < -80 ? `translateX(-100px)` : `translateX(0px)`;
         }
         function deleteAlarm(index) { alarms.splice(index, 1); renderAlarms(); }
+        function formatDays(days) { return days.includes("Never") ? "Once" : (days.length === 7 ? "Daily" : days.map(d => d.slice(0, 3)).join(", ")); }
 
-        // Helper
-        function formatDays(daysArray) {
-            if (daysArray.includes("Never")) return "Once";
-            if (daysArray.length === 7) return "Daily";
-            return daysArray.map(d => d.slice(0, 3)).join(", ");
+        // --- MENUS & MODALS ---
+        function openSettings() { 
+            renderSettingsLocations();
+            document.getElementById('settings-modal').style.display = 'flex'; 
         }
+        function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
 
-        // --- MENUS & MODALS LOGIC ---
-        function openSettings() { alert("Settings"); }
+        function openAddMenu() { document.getElementById('menu-modal').style.display = 'block'; }
+        function closeAddMenu() { document.getElementById('menu-modal').style.display = 'none'; }
+        function selectMenuOption(opt) { closeAddMenu(); opt === 'alarm' ? openAddAlarm() : openLocationSearch(); }
 
-        function openAddMenu() {
-            document.getElementById('menu-modal').style.display = 'block'; // Block for menu overlay
-        }
-        function closeAddMenu() {
-            document.getElementById('menu-modal').style.display = 'none';
-        }
-
-        function selectMenuOption(option) {
-            closeAddMenu();
-            if (option === 'alarm') openAddAlarm();
-            if (option === 'location') openLocationSearch();
-        }
-
-        // Add Alarm Logic
         function openAddAlarm() {
             selectedDays = ["Never"]; updateRepeatUI();
-            document.getElementById('new-label').value = "";
-            document.getElementById('new-aqi-op').value = "lt"; 
+            document.getElementById('new-label').value = ""; document.getElementById('new-aqi-op').value = "lt"; 
             document.getElementById('repeat-wrapper').classList.remove('open');
             document.getElementById('add-modal').style.display = 'flex';
         }
         function closeAddAlarm() { document.getElementById('add-modal').style.display = 'none'; }
-
-        // Add Location Logic
         function openLocationSearch() {
-            document.getElementById('loc-search-input').value = "";
-            document.getElementById('search-results').innerHTML = "";
+            document.getElementById('loc-search-input').value = ""; document.getElementById('search-results').innerHTML = "";
             document.getElementById('location-modal').style.display = 'flex';
         }
         function closeLocationSearch() { document.getElementById('location-modal').style.display = 'none'; }
-        
+
         function handleSearch(e) {
             const val = e.target.value;
             const resultsDiv = document.getElementById('search-results');
             if (val.length > 2) {
-                // Mock Results
                 resultsDiv.innerHTML = `
-                    <div class="search-item" onclick="addLocation('Beijing')">
-                        <div class="search-item-city">Beijing</div>
-                        <div class="search-item-country">China</div>
-                    </div>
-                    <div class="search-item" onclick="addLocation('Tokyo')">
-                        <div class="search-item-city">Tokyo</div>
-                        <div class="search-item-country">Japan</div>
-                    </div>
+                    <div class="search-item" onclick="addLocation('Beijing')"><div class="search-item-city">Beijing</div><div class="search-item-country">China</div></div>
+                    <div class="search-item" onclick="addLocation('Tokyo')"><div class="search-item-city">Tokyo</div><div class="search-item-country">Japan</div></div>
                 `;
-            } else {
-                resultsDiv.innerHTML = "";
-            }
+            } else resultsDiv.innerHTML = "";
         }
 
         function addLocation(name) {
-            // Add new mock location
-            locations.push({ 
-                name: name, 
-                aqi: Math.floor(Math.random() * 100), 
-                status: "Good", 
-                pollutant: "PM2.5", 
-                time: "Now", 
-                isCurrent: false, 
-                color: "var(--aqi-good)" 
-            });
-            currentLocIndex = locations.length - 1; // Jump to new location
+            locations.push({ name: name, aqi: Math.floor(Math.random()*100), status: "Good", pollutant: "PM2.5", time: "Now", isCurrent: false, color: "var(--aqi-good)" });
+            currentLocIndex = locations.length - 1; renderDashboard(); closeLocationSearch();
+        }
+
+        function removeLocation(index) {
+            // Cannot remove current location (index 0 usually, or flag check)
+            const realIndex = index + 1; // +1 because we skip the first (current) loc in the list render
+            if (realIndex >= locations.length) return;
+            
+            locations.splice(realIndex, 1);
+            if (currentLocIndex >= locations.length) currentLocIndex = locations.length - 1;
             renderDashboard();
-            closeLocationSearch();
         }
 
-        // Save Alarm
+        function renderSettingsLocations() {
+            const container = document.getElementById('settings-location-list');
+            // Filter out current location for deletion list
+            const removableLocs = locations.slice(1);
+            
+            if (removableLocs.length === 0) {
+                container.innerHTML = `<div class="settings-row" style="color: var(--text-secondary); font-size: 14px;">No added locations</div>`;
+            } else {
+                container.innerHTML = removableLocs.map((loc, i) => `
+                    <div class="settings-row">
+                        <span class="settings-label">${loc.name}</span>
+                        <button class="settings-delete-btn" onclick="removeLocation(${i})">Remove</button>
+                    </div>
+                `).join('');
+            }
+        }
+
         function saveAlarm() {
-            const timeVal = document.getElementById('new-time').value;
-            const labelVal = document.getElementById('new-label').value;
-            const aqiVal = document.getElementById('new-aqi').value;
-            const aqiOp = document.getElementById('new-aqi-op').value; 
-            const locVal = document.getElementById('new-location-select').value;
-            const soundVal = document.getElementById('new-sound').value;
-
             alarms.push({ 
-                time: timeVal,
-                label: labelVal,
-                location: locVal,
-                conditions: [{ metric: 'aqi', operator: aqiOp, value: aqiVal }],
-                repeat: [...selectedDays], 
-                sound: soundVal // kept raw for logic, capitalized in UI if needed
+                time: document.getElementById('new-time').value, 
+                label: document.getElementById('new-label').value, 
+                location: document.getElementById('new-location-select').value, 
+                conditions: [{ metric: 'aqi', operator: document.getElementById('new-aqi-op').value, value: document.getElementById('new-aqi').value }], 
+                repeat: [...selectedDays], sound: document.getElementById('new-sound').value 
             });
-
-            renderAlarms();
-            closeAddAlarm();
+            renderAlarms(); closeAddAlarm();
         }
 
-        // Toggle Repeat
         function toggleRepeatDropdown() { document.getElementById('repeat-wrapper').classList.toggle('open'); }
-        function selectRepeat(value) {
-            if (value === "Never") selectedDays = ["Never"];
+        function selectRepeat(val) {
+            if (val === "Never") selectedDays = ["Never"];
             else {
                 if (selectedDays.includes("Never")) selectedDays = [];
-                const idx = selectedDays.indexOf(value);
-                if (idx > -1) selectedDays.splice(idx, 1);
-                else selectedDays.push(value);
+                const idx = selectedDays.indexOf(val);
+                if (idx > -1) selectedDays.splice(idx, 1); else selectedDays.push(val);
                 if (selectedDays.length === 0) selectedDays = ["Never"];
             }
             updateRepeatUI();
         }
         function updateRepeatUI() {
             document.querySelectorAll('.custom-option').forEach(opt => {
-                if (selectedDays.includes(opt.getAttribute('data-value'))) opt.classList.add('selected');
-                else opt.classList.remove('selected');
+                opt.classList.toggle('selected', selectedDays.includes(opt.getAttribute('data-value')));
             });
-            const textSpan = document.getElementById('repeat-text');
-            if (selectedDays.includes("Never")) textSpan.innerText = "Never";
-            else {
-                const dayOrder = ["Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays", "Sundays"];
-                selectedDays.sort((a, b) => dayOrder.indexOf(a) - dayOrder.indexOf(b));
-                textSpan.innerText = selectedDays.map(d => d.slice(0, 3)).join(", ");
-            }
+            const d = ["Mondays","Tuesdays","Wednesdays","Thursdays","Fridays","Saturdays","Sundays"];
+            selectedDays.sort((a,b)=>d.indexOf(a)-d.indexOf(b));
+            document.getElementById('repeat-text').innerText = selectedDays.includes("Never") ? "Never" : selectedDays.map(d=>d.slice(0,3)).join(", ");
         }
 
-        // Init
-        renderDashboard();
-        renderAlarms();
+        renderDashboard(); renderAlarms();
     </script>
 </body>
 </html>
