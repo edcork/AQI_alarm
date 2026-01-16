@@ -349,6 +349,14 @@
             </div>
 
             <div class="form-group">
+                <label class="form-label">Location of reading</label>
+                <select id="new-location" class="form-select">
+                    <option value="Shanghai" selected>Shanghai</option>
+                    <option value="Current Location">Current Location</option>
+                </select>
+            </div>
+
+            <div class="form-group">
                 <label class="form-label">Repeat</label>
                 <div class="custom-select-wrapper" id="repeat-wrapper">
                     <div class="custom-select-trigger" onclick="toggleRepeatDropdown()">
@@ -488,6 +496,7 @@
             updateRepeatUI();
             document.getElementById('new-label').value = "";
             document.getElementById('new-aqi-op').value = "lt"; // Default to Below
+            document.getElementById('new-location').value = "Shanghai"; // Reset location
             document.getElementById('repeat-wrapper').classList.remove('open');
             document.getElementById('add-modal').style.display = 'flex';
         }
@@ -544,14 +553,14 @@
             const timeVal = document.getElementById('new-time').value;
             const labelVal = document.getElementById('new-label').value;
             const aqiVal = document.getElementById('new-aqi').value;
-            const aqiOp = document.getElementById('new-aqi-op').value; // Get Operator
+            const aqiOp = document.getElementById('new-aqi-op').value; 
+            const locVal = document.getElementById('new-location').value; // Capture Location
             const soundVal = document.getElementById('new-sound').value;
 
-            // NEW DATA STRUCTURE: Conditions Array
             alarms.push({ 
                 time: timeVal,
                 label: labelVal,
-                // Instead of 'aqiLimit', we store a conditions list
+                location: locVal, // Store Location
                 conditions: [
                     { metric: 'aqi', operator: aqiOp, value: aqiVal }
                 ],
