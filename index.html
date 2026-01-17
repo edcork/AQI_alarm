@@ -227,6 +227,8 @@
         .settings-row:last-child { border-bottom: none; }
         .settings-label { font-size: 16px; }
         .settings-delete-btn { color: var(--danger-color); background: none; border: none; font-size: 16px; font-weight: 500; cursor: pointer; }
+        /* Link arrow for about section */
+        .settings-arrow { color: var(--text-secondary); font-size: 18px; font-weight: 400; }
 
     </style>
 </head>
@@ -282,8 +284,15 @@
                     <div class="settings-row">
                         <span class="settings-label">AQI Standard</span>
                         <select class="form-select" style="width: auto; padding: 5px 25px 5px 10px; height: 32px; background-position: right 5px center;">
-                            <option>US (EPA)</option>
+                            <option selected>US (EPA)</option>
                             <option>CN (MEP)</option>
+                            <option>EU (CAQI)</option>
+                            <option>IN (NAQI)</option>
+                            <option>UK (DAQI)</option>
+                            <option>AU (AQR)</option>
+                            <option>CA (AQHI)</option>
+                            <option>JP (AQI)</option>
+                            <option>KR (CAI)</option>
                         </select>
                     </div>
                     <div class="settings-row">
@@ -291,6 +300,13 @@
                         <select class="form-select" style="width: auto; padding: 5px 25px 5px 10px; height: 32px; background-position: right 5px center;">
                             <option>Celsius</option>
                             <option>Fahrenheit</option>
+                        </select>
+                    </div>
+                    <div class="settings-row">
+                        <span class="settings-label">Language</span>
+                        <select class="form-select" style="width: auto; padding: 5px 25px 5px 10px; height: 32px; background-position: right 5px center;">
+                            <option>English</option>
+                            <option disabled>Coming soon...</option>
                         </select>
                     </div>
                 </div>
@@ -310,15 +326,23 @@
             <div class="settings-section">
                 <div class="settings-section-title">Locations</div>
                 <div class="settings-list" id="settings-location-list">
-                    </div>
+                </div>
             </div>
 
-             <div class="settings-section">
-                <div class="settings-section-title">Data Source</div>
+            <div class="settings-section">
+                <div class="settings-section-title">About</div>
                 <div class="settings-list">
-                    <div class="settings-row" style="flex-direction: column; align-items: flex-start; gap: 10px;">
-                        <span class="settings-label">API Key (WAQI)</span>
-                        <input type="text" class="form-input" placeholder="Paste key here" style="font-size: 14px; padding: 8px;">
+                    <div class="settings-row" onclick="alert('Contact Us clicked')">
+                        <span class="settings-label">Contact us</span>
+                        <span class="settings-arrow">›</span>
+                    </div>
+                    <div class="settings-row" onclick="alert('Privacy Policy clicked')">
+                        <span class="settings-label">Privacy policy</span>
+                        <span class="settings-arrow">›</span>
+                    </div>
+                    <div class="settings-row" onclick="alert('System Permissions clicked')">
+                        <span class="settings-label">System permissions</span>
+                        <span class="settings-arrow">›</span>
                     </div>
                 </div>
             </div>
