@@ -101,8 +101,8 @@
 
         .forecast-container {
             width: 100%;
-            /* Fixed total height: 50px bars + 60px text = 110px */
-            height: 110px; 
+            /* Fixed total height: 40px bars + 60px text = 100px */
+            height: 100px; 
             display: flex;
             margin-top: 5px;
             margin-bottom: 25px;
@@ -111,7 +111,7 @@
             padding-left: 20px;
             padding-right: 20px;
             box-sizing: border-box;
-            /* Hide scrollbar */
+            align-items: stretch;
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
@@ -120,51 +120,48 @@
         .forecast-column {
             display: flex;
             flex-direction: column;
-            /* Rigid width: 15px */
-            flex: 0 0 15px;
-            width: 15px; 
+            flex: 0 0 14px; /* Fixed width per column */
+            margin-right: 0px;
             height: 100%;
-            margin: 0;
-            position: relative; /* anchor for absolute children if needed */
         }
         
-        /* Bar Area: Fixed Height (50px) */
-        /* This ensures the baseline is exactly 50px from the top of the container */
+        /* Bar Area: Fills remaining space */
         .forecast-bar-area {
-            height: 50px;
+            flex: 1; 
             width: 100%;
             display: flex;
-            align-items: flex-end; /* Bottom align bar */
+            align-items: flex-end; 
             justify-content: center;
+            min-height: 0;
         }
 
         .forecast-bar {
-            width: 12px; /* 12px bar inside 15px col */
+            width: 12px;
             border-top-left-radius: 2px;
             border-top-right-radius: 2px;
             opacity: 0.85;
             transition: background-color 0.3s ease;
         }
 
-        /* Text Area: Fixed Height (60px) */
+        /* Text Area: Fixed Height */
         .forecast-time {
-            height: 60px;
+            height: 60px; 
+            min-height: 60px;
             width: 100%;
-            position: relative; /* Create context for absolute center */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: visible; /* Allow text to spin outside the 14px box */
         }
         
         .forecast-time span {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            /* Bulletproof centering + rotation */
-            transform: translate(-50%, -50%) rotate(-90deg);
-            
-            width: 60px; /* Give it space to not wrap */
+            display: block;
+            width: 60px; /* Ensure text thinks it has space */
+            min-width: 60px; /* Force width to prevent wrapping */
             text-align: center;
             font-size: 10px;
-            line-height: 1;
             color: var(--text-secondary);
+            transform: rotate(-90deg);
             white-space: nowrap;
         }
 
