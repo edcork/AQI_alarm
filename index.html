@@ -101,7 +101,7 @@
 
         .forecast-container {
             width: 100%;
-            height: 160px; /* Fixed height */
+            height: 160px; 
             display: flex;
             margin-top: 5px;
             margin-bottom: 25px;
@@ -110,17 +110,16 @@
             padding-left: 20px;
             padding-right: 20px;
             box-sizing: border-box;
-            align-items: stretch; /* Crucial for equal height columns */
+            align-items: stretch;
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
         .forecast-container::-webkit-scrollbar { display: none; }
 
-        /* The Column */
         .forecast-column {
             display: flex;
             flex-direction: column;
-            flex: 0 0 30px; /* Fixed width */
+            flex: 0 0 30px; /* Fixed width of 30px */
             margin-right: 2px;
             height: 100%;
         }
@@ -130,7 +129,7 @@
             flex: 1; 
             width: 100%;
             display: flex;
-            align-items: flex-end; /* Bar sits at bottom of this area */
+            align-items: flex-end; 
             justify-content: center;
             min-height: 0;
         }
@@ -145,23 +144,25 @@
 
         /* Text Area: Fixed Height */
         .forecast-time {
-            height: 60px; /* Fixed height for label area */
-            min-height: 60px;
+            height: 60px; 
+            min-height: 60px; /* Strict height enforcement */
             width: 100%;
             display: flex;
             align-items: center;
             justify-content: center;
-            /* overflow: visible;  <-- IMPORTANT: Allow text to exceed container width before rotation */
+            flex-shrink: 0; /* Never shrink this container */
         }
         
         .forecast-time span {
             display: block;
-            width: 60px; /* Give text plenty of layout width */
+            width: 60px; /* Force visual width */
+            min-width: 60px; /* Ensure it never shrinks below 60px */
             text-align: center;
             font-size: 10px;
             color: var(--text-secondary);
-            transform: rotate(-90deg); /* Rotate CCW to read up */
+            transform: rotate(-90deg);
             white-space: nowrap;
+            flex-shrink: 0; /* Crucial for iPhone: Prevent flex item compression */
         }
 
 
