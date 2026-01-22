@@ -101,7 +101,8 @@
 
         .forecast-container {
             width: 100%;
-            height: 160px; /* Fixed height */
+            /* Increased height to allow room for rotation */
+            height: 200px; 
             display: flex;
             margin-top: 5px;
             margin-bottom: 25px;
@@ -110,59 +111,55 @@
             padding-left: 20px;
             padding-right: 20px;
             box-sizing: border-box;
-            -webkit-overflow-scrolling: touch;
+            /* Hide scrollbar */
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
         .forecast-container::-webkit-scrollbar { display: none; }
 
-        /* The Column: Holds the Bar Area (top) and Text Area (bottom) */
         .forecast-column {
             display: flex;
             flex-direction: column;
-            min-width: 30px; /* Wider column for better touch/visibility */
-            height: 100%;
+            flex: 0 0 30px; /* Wide enough for finger tap */
             margin-right: 2px;
+            height: 100%;
         }
         
-        /* The Top Area: Strictly defined height for the bar space */
+        /* Top Area: Fills remaining space */
         .forecast-bar-area {
-            height: calc(100% - 50px); /* Fill space minus text height */
+            flex: 1; /* Grow to fill space above text */
             width: 100%;
             display: flex;
-            align-items: flex-end; /* Align bar to bottom of this area */
-            justify-content: center; /* Center bar horizontally */
+            align-items: flex-end; /* Bottom align the bar */
+            justify-content: center;
+            min-height: 0; /* Important for flex nesting */
         }
 
-        /* The Bar Itself */
+        /* The Bar */
         .forecast-bar {
-            width: 18px; /* Wider, substantial bars */
+            width: 18px; 
             border-top-left-radius: 3px;
             border-top-right-radius: 3px;
             opacity: 0.85;
             transition: background-color 0.3s ease;
-            /* Height is set via inline JS style */
         }
 
-        /* The Bottom Area: Strictly defined height for text */
+        /* Bottom Area: Fixed Height for Text */
         .forecast-time {
-            height: 50px;
-            min-height: 50px;
+            height: 80px; /* Fixed height to accommodate long rotated text */
+            flex-shrink: 0; /* Prevent shrinking */
             width: 100%;
             display: flex;
             align-items: center;
             justify-content: center;
-            position: relative;
+            overflow: hidden; /* Clean clipping */
         }
         
-        /* The Rotated Text */
         .forecast-time span {
-            position: absolute;
-            font-size: 10px;
+            font-size: 11px;
             color: var(--text-secondary);
-            transform: rotate(-90deg); /* Counter-clockwise to read up */
+            transform: rotate(90deg);
             white-space: nowrap;
-            /* Adjust offset if needed */
         }
 
 
