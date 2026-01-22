@@ -55,7 +55,7 @@
 
         /* --- TOP AREA: DASHBOARD --- */
         #aqi-area {
-            flex: 4;
+            flex: 5; /* Adjusted balance */
             position: relative;
             background: linear-gradient(180deg, #1c1c1e 0%, #000000 100%);
             border-bottom: 1px solid #333;
@@ -87,81 +87,67 @@
         .aqi-status { font-size: 20px; font-weight: 500; margin-bottom: 10px; }
         .aqi-details { display: flex; flex-direction: row; gap: 15px; font-size: 12px; color: var(--text-secondary); margin-bottom: 15px; }
 
-        /* --- FORECAST CHART --- */
+        /* --- FORECAST CHART (FIXED 24H) --- */
         .forecast-title {
             width: 100%;
             text-align: center;
             font-size: 12px;
             color: var(--text-secondary);
             font-weight: 600;
-            margin-bottom: 8px;
+            margin-bottom: 15px;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
 
         .forecast-container {
-            width: 100%;
-            /* Fixed total height: 40px bars + 60px text = 100px */
+            width: 90%; /* Use 90% of screen width */
             height: 100px; 
             display: flex;
-            margin-top: 5px;
+            justify-content: space-between; /* Evenly space the 24 bars */
             margin-bottom: 25px;
-            overflow-x: auto;
-            overflow-y: hidden;
-            padding-left: 20px;
-            padding-right: 20px;
-            box-sizing: border-box;
-            align-items: stretch;
-            -ms-overflow-style: none;
-            scrollbar-width: none;
+            /* No scrolling overflow */
         }
-        .forecast-container::-webkit-scrollbar { display: none; }
 
         .forecast-column {
             display: flex;
             flex-direction: column;
-            flex: 0 0 14px; /* Fixed width per column */
-            margin-right: 0px;
+            flex: 1; /* Each column takes equal width */
             height: 100%;
+            align-items: center;
+            position: relative; /* For absolute text positioning if needed */
         }
         
-        /* Bar Area: Fills remaining space */
+        /* Bar Area */
         .forecast-bar-area {
-            flex: 1; 
+            height: 60px; /* Top 60% for bars */
             width: 100%;
             display: flex;
-            align-items: flex-end; 
+            align-items: flex-end;
             justify-content: center;
-            min-height: 0;
         }
 
         .forecast-bar {
-            width: 12px;
-            border-top-left-radius: 2px;
-            border-top-right-radius: 2px;
+            width: 60%; /* Bar is 60% of column width */
+            max-width: 8px; /* Cap width for aesthetics */
+            border-radius: 2px;
             opacity: 0.85;
             transition: background-color 0.3s ease;
         }
 
-        /* Text Area: Fixed Height */
+        /* Label Area */
         .forecast-time {
-            height: 60px; 
-            min-height: 60px;
+            height: 40px; /* Bottom 40% for text */
             width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: visible; /* Allow text to spin outside the 14px box */
+            position: relative;
         }
         
         .forecast-time span {
-            display: block;
-            width: 60px; /* Ensure text thinks it has space */
-            min-width: 60px; /* Force width to prevent wrapping */
-            text-align: center;
+            position: absolute;
+            left: 50%;
+            top: 5px; /* Push down slightly */
+            transform: translateX(-50%) rotate(0deg); /* No rotation needed for spaced labels */
             font-size: 10px;
             color: var(--text-secondary);
-            transform: rotate(-90deg);
             white-space: nowrap;
         }
 
@@ -178,7 +164,7 @@
 
         /* --- BOTTOM AREA: ALARMS LIST --- */
         #alarms-area {
-            flex: 6; 
+            flex: 5; 
             padding: 20px; overflow-y: auto;
             display: flex; flex-direction: column; overflow-x: hidden;
         }
@@ -531,9 +517,9 @@
         let selectedDays = ["Never"];
         let timeFormat = "24h";
         
-        // Mock Forecast Data Gen: 72 hours, storing raw hour integer
+        // Mock Forecast Data Gen: 24 hours only
         function genForecast() {
-            return Array.from({length: 72}, (_, i) => ({
+            return Array.from({length: 24}, (_, i) => ({
                 val: Math.floor(Math.random() * 100) + 20,
                 hour: (new Date().getHours() + i) % 24
             }));
@@ -556,7 +542,7 @@
                     ? `<svg class="location-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"></path></svg>` 
                     : '';
 
-                // Build Forecast Chart HTML with strict wrapper
+                // Build Forecast Chart HTML with simplified non-scrolling layout
                 const barsHtml = loc.forecast.map((d, i) => {
                     let col = "var(--aqi-good)";
                     if (d.val > 50) col = "var(--aqi-moderate)";
@@ -566,15 +552,15 @@
                     // Fixed height (100%), color only
                     const h = 100;
 
-                    // Time label logic
+                    // Time label logic: Show every 4th label (0, 4, 8...)
                     let timeLabel = "";
-                    if (i % 3 === 0) { // Every 3rd hour
+                    if (i % 4 === 0) { 
                         if (timeFormat === '24h') {
                             timeLabel = (d.hour < 10 ? '0' : '') + d.hour + ":00";
                         } else {
                             const suffix = d.hour >= 12 ? 'PM' : 'AM';
                             const h12 = d.hour % 12 || 12;
-                            timeLabel = h12 + " " + suffix;
+                            timeLabel = h12 + "" + suffix;
                         }
                     }
 
@@ -583,7 +569,9 @@
                             <div class="forecast-bar-area">
                                 <div class="forecast-bar" style="height: ${h}%; background-color: ${col};"></div>
                             </div>
-                            <div class="forecast-time"><span>${timeLabel}</span></div>
+                            <div class="forecast-time">
+                                ${timeLabel ? `<span>${timeLabel}</span>` : ''}
+                            </div>
                         </div>
                     `;
                 }).join('');
@@ -597,7 +585,7 @@
                         <span>Major pollutant: ${loc.pollutant}</span><span>•</span><span>Last updated: ${loc.time}</span>
                     </div>
 
-                    <div class="forecast-title">FORECAST</div>
+                    <div class="forecast-title">24H FORECAST</div>
                     <div class="forecast-container">
                         ${barsHtml}
                     </div>
@@ -620,12 +608,9 @@
         dashArea.addEventListener('touchstart', (e) => { dashStartX = e.touches[0].clientX; });
         dashArea.addEventListener('touchend', (e) => {
             const diff = e.changedTouches[0].clientX - dashStartX;
-            // Only swipe location if the swipe was big enough and NOT inside the chart (chart has its own scroll)
-            if (!e.target.closest('.forecast-container')) {
-                if (diff > 50 && currentLocIndex > 0) currentLocIndex--;
-                else if (diff < -50 && currentLocIndex < locations.length - 1) currentLocIndex++;
-                renderDashboard();
-            }
+            if (diff > 50 && currentLocIndex > 0) currentLocIndex--;
+            else if (diff < -50 && currentLocIndex < locations.length - 1) currentLocIndex++;
+            renderDashboard();
         });
 
         function updateLocationDropdown() {
