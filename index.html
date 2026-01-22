@@ -101,8 +101,8 @@
 
         .forecast-container {
             width: 100%;
-            /* UPDATED: Reduced height to compact the chart */
-            height: 100px; 
+            /* Fixed total height: 50px bars + 60px text = 110px */
+            height: 110px; 
             display: flex;
             margin-top: 5px;
             margin-bottom: 25px;
@@ -111,7 +111,7 @@
             padding-left: 20px;
             padding-right: 20px;
             box-sizing: border-box;
-            align-items: stretch;
+            /* Hide scrollbar */
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
@@ -120,54 +120,52 @@
         .forecast-column {
             display: flex;
             flex-direction: column;
-            /* UPDATED: Reduced column width to 14px */
-            flex: 0 0 14px; 
-            /* UPDATED: Removed margin for tighter spacing */
-            margin-right: 0px; 
+            /* Rigid width: 15px */
+            flex: 0 0 15px;
+            width: 15px; 
             height: 100%;
-            align-items: center; /* Center the bar in the column */
+            margin: 0;
+            position: relative; /* anchor for absolute children if needed */
         }
         
-        /* Bar Area: Fills remaining space */
+        /* Bar Area: Fixed Height (50px) */
+        /* This ensures the baseline is exactly 50px from the top of the container */
         .forecast-bar-area {
-            flex: 1; 
+            height: 50px;
             width: 100%;
             display: flex;
-            align-items: flex-end; 
+            align-items: flex-end; /* Bottom align bar */
             justify-content: center;
-            min-height: 0;
         }
 
         .forecast-bar {
-            /* UPDATED: Reduced bar width to 12px */
-            width: 12px;
+            width: 12px; /* 12px bar inside 15px col */
             border-top-left-radius: 2px;
             border-top-right-radius: 2px;
             opacity: 0.85;
             transition: background-color 0.3s ease;
         }
 
-        /* Text Area: Fixed Height */
+        /* Text Area: Fixed Height (60px) */
         .forecast-time {
-            height: 60px; 
-            min-height: 60px; /* Keep this fixed to preserve alignment */
+            height: 60px;
             width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0; 
+            position: relative; /* Create context for absolute center */
         }
         
         .forecast-time span {
-            display: block;
-            width: 60px;
-            min-width: 60px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            /* Bulletproof centering + rotation */
+            transform: translate(-50%, -50%) rotate(-90deg);
+            
+            width: 60px; /* Give it space to not wrap */
             text-align: center;
             font-size: 10px;
+            line-height: 1;
             color: var(--text-secondary);
-            transform: rotate(-90deg);
             white-space: nowrap;
-            flex-shrink: 0; 
         }
 
 
