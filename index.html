@@ -82,7 +82,6 @@
         .aqi-location-row { display: flex; align-items: center; gap: 6px; margin-bottom: 0px; }
         .aqi-location { font-size: 18px; font-weight: 500; }
         
-        /* UPDATED: Rotated compass icon */
         .location-icon { 
             width: 16px; 
             height: 16px; 
@@ -108,7 +107,6 @@
 
         .forecast-container {
             width: 90%; 
-            /* UPDATED: Reduced total height */
             height: 75px; 
             display: flex;
             justify-content: space-between;
@@ -126,11 +124,10 @@
         
         /* Bar Area */
         .forecast-bar-area {
-            /* UPDATED: Halved height */
             height: 30px; 
             width: 100%;
             display: flex;
-            align-items: flex-end;
+            align-items: flex-end; /* Grows from bottom */
             justify-content: center;
         }
 
@@ -139,7 +136,7 @@
             max-width: 8px; 
             border-radius: 2px;
             opacity: 0.85;
-            transition: background-color 0.3s ease;
+            transition: height 0.3s ease, background-color 0.3s ease;
         }
 
         /* Label Area */
@@ -558,7 +555,7 @@
                     if (d.val > 150) col = "var(--danger-color)";
                     
                     // Fixed height (100%), color only
-                    const h = 100;
+                    const h = Math.min((d.val / 500) * 100, 100);
 
                     // Time label logic: Show every 4th label (0, 4, 8...)
                     let timeLabel = "";
