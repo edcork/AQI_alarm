@@ -101,8 +101,7 @@
 
         .forecast-container {
             width: 100%;
-            /* Increased height to allow room for rotation */
-            height: 200px; 
+            height: 160px; /* Fixed height */
             display: flex;
             margin-top: 5px;
             margin-bottom: 25px;
@@ -111,54 +110,57 @@
             padding-left: 20px;
             padding-right: 20px;
             box-sizing: border-box;
-            /* Hide scrollbar */
+            align-items: stretch; /* Crucial for equal height columns */
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
         .forecast-container::-webkit-scrollbar { display: none; }
 
+        /* The Column */
         .forecast-column {
             display: flex;
             flex-direction: column;
-            flex: 0 0 30px; /* Wide enough for finger tap */
+            flex: 0 0 30px; /* Fixed width */
             margin-right: 2px;
             height: 100%;
         }
         
-        /* Top Area: Fills remaining space */
+        /* Bar Area: Fills remaining space */
         .forecast-bar-area {
-            flex: 1; /* Grow to fill space above text */
+            flex: 1; 
             width: 100%;
             display: flex;
-            align-items: flex-end; /* Bottom align the bar */
+            align-items: flex-end; /* Bar sits at bottom of this area */
             justify-content: center;
-            min-height: 0; /* Important for flex nesting */
+            min-height: 0;
         }
 
-        /* The Bar */
         .forecast-bar {
-            width: 18px; 
+            width: 18px;
             border-top-left-radius: 3px;
             border-top-right-radius: 3px;
             opacity: 0.85;
             transition: background-color 0.3s ease;
         }
 
-        /* Bottom Area: Fixed Height for Text */
+        /* Text Area: Fixed Height */
         .forecast-time {
-            height: 80px; /* Fixed height to accommodate long rotated text */
-            flex-shrink: 0; /* Prevent shrinking */
+            height: 60px; /* Fixed height for label area */
+            min-height: 60px;
             width: 100%;
             display: flex;
             align-items: center;
             justify-content: center;
-            overflow: hidden; /* Clean clipping */
+            /* overflow: visible;  <-- IMPORTANT: Allow text to exceed container width before rotation */
         }
         
         .forecast-time span {
-            font-size: 11px;
+            display: block;
+            width: 60px; /* Give text plenty of layout width */
+            text-align: center;
+            font-size: 10px;
             color: var(--text-secondary);
-            transform: rotate(90deg);
+            transform: rotate(-90deg); /* Rotate CCW to read up */
             white-space: nowrap;
         }
 
