@@ -90,7 +90,7 @@
         /* --- FORECAST CHART --- */
         .forecast-title {
             width: 100%;
-            text-align: center; /* Centered */
+            text-align: center;
             font-size: 12px;
             color: var(--text-secondary);
             font-weight: 600;
@@ -101,52 +101,50 @@
 
         .forecast-container {
             width: 100%;
-            height: 90px;
+            height: 110px; /* Increased height to prevent vertical scroll */
             display: flex;
-            align-items: flex-end;
-            justify-content: flex-start; /* Start from left for scrolling */
+            align-items: flex-start; /* Align top so text hangs down */
+            justify-content: flex-start;
             margin-top: 5px;
             margin-bottom: 25px;
-            overflow-x: auto; /* Scrollable horizontal */
-            padding-left: 20px; /* Padding for start */
+            overflow-x: auto;
+            overflow-y: hidden; /* Force no vertical scroll */
+            padding-left: 20px;
             padding-right: 20px;
             box-sizing: border-box;
-            /* Hide scrollbar for clean look */
-            -ms-overflow-style: none;  /* IE and Edge */
-            scrollbar-width: none;  /* Firefox */
+            -ms-overflow-style: none;
+            scrollbar-width: none;
         }
-        .forecast-container::-webkit-scrollbar {
-            display: none; /* Chrome, Safari, Opera */
-        }
+        .forecast-container::-webkit-scrollbar { display: none; }
 
         .forecast-column {
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: flex-end;
-            flex: 0 0 14px; /* Fixed width per bar, don't shrink */
+            justify-content: flex-start; /* Start from top */
+            flex: 0 0 14px;
             height: 100%;
-            gap: 4px;
+            gap: 8px; /* Space between bar and text */
         }
+        
         .forecast-bar {
             width: 6px;
             border-radius: 4px;
-            min-height: 4px;
             opacity: 0.8;
-            transition: height 0.3s ease;
+            /* Height is handled in JS (100% now) */
+            transition: background-color 0.3s ease;
         }
+
         .forecast-time {
             font-size: 10px;
             color: var(--text-secondary);
-            transform: rotate(-90deg); /* Vertical */
-            height: 20px;
+            transform: rotate(-90deg);
             width: 20px;
-            text-align: right; /* Align text to "top" of rotated box */
-            margin-top: 2px;
-            display: flex;
-            align-items: center;
-            justify-content: flex-end; /* Pushes text up towards bar */
+            text-align: right; 
             white-space: nowrap;
+            /* Positioning adjustment for rotated text */
+            transform-origin: center center;
+            margin-top: 10px; 
         }
 
 
@@ -299,6 +297,15 @@
         /* Link arrow for about section */
         .settings-arrow { color: var(--text-secondary); font-size: 18px; font-weight: 400; }
 
+        /* Right Aligned Selects */
+        .settings-select {
+            width: auto; padding: 5px 25px 5px 10px; height: 32px; 
+            background-position: right 5px center;
+            text-align: right; /* Aligns text right */
+            text-align-last: right; /* Aligns selected text right in Chrome/Safari */
+            direction: ltr;
+        }
+
     </style>
 </head>
 <body>
@@ -352,7 +359,7 @@
                 <div class="settings-list">
                     <div class="settings-row">
                         <span class="settings-label">AQI Standard</span>
-                        <select class="form-select" style="width: auto; padding: 5px 25px 5px 10px; height: 32px; background-position: right 5px center;">
+                        <select class="form-select settings-select">
                             <option selected>US (EPA)</option>
                             <option>CN (MEP)</option>
                             <option>EU (CAQI)</option>
@@ -366,21 +373,21 @@
                     </div>
                     <div class="settings-row">
                         <span class="settings-label">Temperature Unit</span>
-                        <select class="form-select" style="width: auto; padding: 5px 25px 5px 10px; height: 32px; background-position: right 5px center;">
+                        <select class="form-select settings-select">
                             <option>Celsius</option>
                             <option>Fahrenheit</option>
                         </select>
                     </div>
                     <div class="settings-row">
                         <span class="settings-label">Time Format</span>
-                        <select id="setting-time-fmt" class="form-select" style="width: auto; padding: 5px 25px 5px 10px; height: 32px; background-position: right 5px center;" onchange="updateTimeFormat(this.value)">
+                        <select id="setting-time-fmt" class="form-select settings-select" onchange="updateTimeFormat(this.value)">
                             <option value="24h" selected>24 Hour</option>
                             <option value="12h">12 Hour</option>
                         </select>
                     </div>
                     <div class="settings-row">
                         <span class="settings-label">Language</span>
-                        <select class="form-select" style="width: auto; padding: 5px 25px 5px 10px; height: 32px; background-position: right 5px center;">
+                        <select class="form-select settings-select">
                             <option>English</option>
                             <option disabled>Coming soon...</option>
                         </select>
@@ -538,8 +545,8 @@
                     if (d.val > 100) col = "var(--aqi-unhealthy)";
                     if (d.val > 150) col = "var(--danger-color)";
                     
-                    // Scale bar height: compressed height
-                    const h = Math.min((d.val / 200) * 100, 100); 
+                    // Fixed height (100%), color only
+                    const h = 100;
 
                     // Time label logic
                     let timeLabel = "";
@@ -594,9 +601,6 @@
         dashArea.addEventListener('touchend', (e) => {
             const diff = e.changedTouches[0].clientX - dashStartX;
             // Only swipe location if the swipe was big enough and NOT inside the chart (chart has its own scroll)
-            // But touch events bubble. For simplicity, we swipe location unless user swipes strictly horizontally on chart.
-            // Actually, chart overflow-x handles swipe naturally. We need to prevent dash swipe if target is chart?
-            // Simple approach: if scrollable area is touched, let it scroll. 
             if (!e.target.closest('.forecast-container')) {
                 if (diff > 50 && currentLocIndex > 0) currentLocIndex--;
                 else if (diff < -50 && currentLocIndex < locations.length - 1) currentLocIndex++;
@@ -696,7 +700,8 @@
         }
 
         function removeLocation(index) {
-            const realIndex = index + 1; // skip current
+            // Cannot remove current location (index 0 usually, or flag check)
+            const realIndex = index + 1; // +1 because we skip the first (current) loc in the list render
             if (realIndex >= locations.length) return;
             
             locations.splice(realIndex, 1);
@@ -706,6 +711,7 @@
 
         function renderSettingsLocations() {
             const container = document.getElementById('settings-location-list');
+            // Filter out current location for deletion list
             const removableLocs = locations.slice(1);
             
             if (removableLocs.length === 0) {
