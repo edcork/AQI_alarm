@@ -55,7 +55,7 @@
 
         /* --- TOP AREA: DASHBOARD --- */
         #aqi-area {
-            flex: 5; /* Adjusted balance */
+            flex: 5;
             position: relative;
             background: linear-gradient(180deg, #1c1c1e 0%, #000000 100%);
             border-bottom: 1px solid #333;
@@ -81,7 +81,14 @@
 
         .aqi-location-row { display: flex; align-items: center; gap: 6px; margin-bottom: 0px; }
         .aqi-location { font-size: 18px; font-weight: 500; }
-        .location-icon { width: 16px; height: 16px; fill: var(--text-secondary); }
+        
+        /* UPDATED: Rotated compass icon */
+        .location-icon { 
+            width: 16px; 
+            height: 16px; 
+            fill: var(--text-secondary);
+            transform: rotate(45deg); 
+        }
 
         .aqi-value { font-size: 70px; font-weight: 700; line-height: 1; margin: 5px 0; }
         .aqi-status { font-size: 20px; font-weight: 500; margin-bottom: 10px; }
@@ -100,26 +107,27 @@
         }
 
         .forecast-container {
-            width: 90%; /* Use 90% of screen width */
-            height: 100px; 
+            width: 90%; 
+            /* UPDATED: Reduced total height */
+            height: 75px; 
             display: flex;
-            justify-content: space-between; /* Evenly space the 24 bars */
+            justify-content: space-between;
             margin-bottom: 25px;
-            /* No scrolling overflow */
         }
 
         .forecast-column {
             display: flex;
             flex-direction: column;
-            flex: 1; /* Each column takes equal width */
+            flex: 1; 
             height: 100%;
             align-items: center;
-            position: relative; /* For absolute text positioning if needed */
+            position: relative; 
         }
         
         /* Bar Area */
         .forecast-bar-area {
-            height: 60px; /* Top 60% for bars */
+            /* UPDATED: Halved height */
+            height: 30px; 
             width: 100%;
             display: flex;
             align-items: flex-end;
@@ -127,8 +135,8 @@
         }
 
         .forecast-bar {
-            width: 60%; /* Bar is 60% of column width */
-            max-width: 8px; /* Cap width for aesthetics */
+            width: 60%; 
+            max-width: 8px; 
             border-radius: 2px;
             opacity: 0.85;
             transition: background-color 0.3s ease;
@@ -136,7 +144,7 @@
 
         /* Label Area */
         .forecast-time {
-            height: 40px; /* Bottom 40% for text */
+            height: 40px; 
             width: 100%;
             position: relative;
         }
@@ -144,8 +152,8 @@
         .forecast-time span {
             position: absolute;
             left: 50%;
-            top: 5px; /* Push down slightly */
-            transform: translateX(-50%) rotate(0deg); /* No rotation needed for spaced labels */
+            top: 5px; 
+            transform: translateX(-50%) rotate(0deg);
             font-size: 10px;
             color: var(--text-secondary);
             white-space: nowrap;
@@ -542,7 +550,7 @@
                     ? `<svg class="location-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"></path></svg>` 
                     : '';
 
-                // Build Forecast Chart HTML with simplified non-scrolling layout
+                // Build Forecast Chart HTML with strict wrapper
                 const barsHtml = loc.forecast.map((d, i) => {
                     let col = "var(--aqi-good)";
                     if (d.val > 50) col = "var(--aqi-moderate)";
