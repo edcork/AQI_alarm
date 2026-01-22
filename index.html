@@ -93,7 +93,7 @@
         .aqi-status { font-size: 20px; font-weight: 500; margin-bottom: 10px; }
         .aqi-details { display: flex; flex-direction: row; gap: 15px; font-size: 12px; color: var(--text-secondary); margin-bottom: 15px; }
 
-        /* --- FORECAST CHART --- */
+        /* --- FORECAST CHART (FIXED 24H) --- */
         .forecast-title {
             width: 100%;
             text-align: center;
@@ -107,7 +107,6 @@
 
         .forecast-container {
             width: 90%; 
-            /* Increased height to 90px to fit icons (15px icon + 30px bar + 40px text + gap) */
             height: 90px; 
             display: flex;
             justify-content: space-between;
@@ -130,15 +129,15 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 2px; /* Small gap above bar */
+            margin-bottom: 2px;
         }
 
         .alarm-marker-icon {
-            width: 100%; /* Fill column width as requested */
+            width: 100%; 
             height: auto;
-            max-height: 12px; /* But limit height to keep it neat */
+            max-height: 14px; /* Slightly larger for detail */
             fill: var(--text-primary);
-            opacity: 0.8;
+            opacity: 0.9;
         }
         
         /* Bar Area */
@@ -591,7 +590,7 @@
                     // Check for active alarm at this hour
                     const hasActiveAlarm = alarms.some(a => a.active && parseInt(a.time.split(':')[0]) === d.hour);
                     const markerHtml = hasActiveAlarm 
-                        ? `<svg class="alarm-marker-icon" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"></path></svg>` 
+                        ? `<svg class="alarm-marker-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M22 5.72l-4.6-3.86-1.29 1.53 4.6 3.86L22 5.72zM7.88 3.39L6.6 1.86 2 5.71l1.29 1.53 4.59-3.85zM12.5 8H11v6l4.75 2.85.75-1.23-4-2.37V8zM12 4c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9-4.03-9-9-9zm0 16c-3.86 0-7-3.14-7-7s3.14-7 7-7 7 3.14 7 7-3.14 7-7 7z"/></svg>` 
                         : '';
 
                     return `
