@@ -93,7 +93,7 @@
         .aqi-status { font-size: 20px; font-weight: 500; margin-bottom: 10px; }
         .aqi-details { display: flex; flex-direction: row; gap: 15px; font-size: 12px; color: var(--text-secondary); margin-bottom: 15px; }
 
-        /* --- FORECAST CHART (FIXED 24H) --- */
+        /* --- FORECAST CHART --- */
         .forecast-title {
             width: 100%;
             text-align: center;
@@ -107,7 +107,8 @@
 
         .forecast-container {
             width: 90%; 
-            height: 75px; 
+            /* Increased height to 90px to fit icons (15px icon + 30px bar + 40px text + gap) */
+            height: 90px; 
             display: flex;
             justify-content: space-between;
             margin-bottom: 25px;
@@ -121,13 +122,31 @@
             align-items: center;
             position: relative; 
         }
+
+        /* New Icon Area */
+        .forecast-icon-area {
+            height: 15px;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 2px; /* Small gap above bar */
+        }
+
+        .alarm-marker-icon {
+            width: 100%; /* Fill column width as requested */
+            height: auto;
+            max-height: 12px; /* But limit height to keep it neat */
+            fill: var(--text-primary);
+            opacity: 0.8;
+        }
         
         /* Bar Area */
         .forecast-bar-area {
             height: 30px; 
             width: 100%;
             display: flex;
-            align-items: flex-end; /* Grows from bottom */
+            align-items: flex-end;
             justify-content: center;
         }
 
@@ -150,7 +169,7 @@
             position: absolute;
             left: 50%;
             top: 5px; 
-            transform: translateX(-50%) rotate(0deg);
+            transform: translateX(-50%);
             font-size: 10px;
             color: var(--text-secondary);
             white-space: nowrap;
@@ -569,8 +588,17 @@
                         }
                     }
 
+                    // Check for active alarm at this hour
+                    const hasActiveAlarm = alarms.some(a => a.active && parseInt(a.time.split(':')[0]) === d.hour);
+                    const markerHtml = hasActiveAlarm 
+                        ? `<svg class="alarm-marker-icon" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"></path></svg>` 
+                        : '';
+
                     return `
                         <div class="forecast-column">
+                            <div class="forecast-icon-area">
+                                ${markerHtml}
+                            </div>
                             <div class="forecast-bar-area">
                                 <div class="forecast-bar" style="height: ${h}%; background-color: ${col};"></div>
                             </div>
@@ -647,7 +675,10 @@
                                 ${alarm.label ? `<div class="alarm-label">${alarm.label}</div>` : ''}
                                 <div class="alarm-details">${alarm.location} • ${formatDays(alarm.repeat)}</div>
                             </div>
-                            <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+                            <label class="switch">
+                                <input type="checkbox" ${alarm.active ? 'checked' : ''} onchange="toggleAlarm(${index})">
+                                <span class="slider"></span>
+                            </label>
                         </div>
                     </div>
                 `}).join('');
@@ -666,7 +697,7 @@
             const row = document.getElementById(`row-${index}`);
             row.style.transform = (e.changedTouches[0].clientX - listStartX) < -80 ? `translateX(-100px)` : `translateX(0px)`;
         }
-        function deleteAlarm(index) { alarms.splice(index, 1); renderAlarms(); }
+        function deleteAlarm(index) { alarms.splice(index, 1); renderAlarms(); renderDashboard(); }
         function formatDays(days) { return days.includes("Never") ? "Once" : (days.length === 7 ? "Daily" : days.map(d => d.slice(0, 3)).join(", ")); }
 
         // --- MENUS & MODALS ---
@@ -742,9 +773,21 @@
                 label: document.getElementById('new-label').value, 
                 location: document.getElementById('new-location-select').value, 
                 conditions: [{ metric: 'aqi', operator: document.getElementById('new-aqi-op').value, value: document.getElementById('new-aqi').value }], 
-                repeat: [...selectedDays], sound: document.getElementById('new-sound').value 
+                repeat: [...selectedDays], 
+                sound: document.getElementById('new-sound').value,
+                active: true 
             });
-            renderAlarms(); closeAddAlarm();
+            renderAlarms(); 
+            renderDashboard(); // Re-render dash to show icon
+            closeAddAlarm();
+        }
+
+        // New function to toggle alarm active state
+        function toggleAlarm(index) {
+            alarms[index].active = !alarms[index].active;
+            // No need to re-render alarms list as the checkbox handles its own state visually, 
+            // but we MUST re-render the dashboard to update the icons.
+            renderDashboard();
         }
 
         function toggleRepeatDropdown() { document.getElementById('repeat-wrapper').classList.toggle('open'); }
