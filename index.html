@@ -101,63 +101,67 @@
 
         .forecast-container {
             width: 100%;
-            height: 160px; /* Fixed height container */
+            height: 160px; /* Fixed height */
             display: flex;
             margin-top: 5px;
             margin-bottom: 25px;
             overflow-x: auto;
-            overflow-y: hidden; 
+            overflow-y: hidden;
             padding-left: 20px;
             padding-right: 20px;
             box-sizing: border-box;
-            /* Hide scrollbar */
+            align-items: stretch; /* Crucial for equal height columns */
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
         .forecast-container::-webkit-scrollbar { display: none; }
 
+        /* The Column */
         .forecast-column {
             display: flex;
             flex-direction: column;
-            align-items: center;
-            justify-content: flex-start; /* Align from top */
-            flex: 0 0 14px; /* Fixed width */
-            height: 100%; /* Take full 160px */
-            gap: 0;
+            flex: 0 0 30px; /* Fixed width */
+            margin-right: 2px;
+            height: 100%;
         }
         
+        /* Bar Area: Fills remaining space */
+        .forecast-bar-area {
+            flex: 1; 
+            width: 100%;
+            display: flex;
+            align-items: flex-end; /* Bar sits at bottom of this area */
+            justify-content: center;
+            min-height: 0;
+        }
+
         .forecast-bar {
-            width: 6px;
-            border-radius: 4px;
-            opacity: 0.8;
-            /* FIX FOR IOS: Explicit height calculation instead of flex: 1 */
-            height: calc(100% - 60px); 
-            margin-bottom: 5px;
+            width: 18px;
+            border-top-left-radius: 3px;
+            border-top-right-radius: 3px;
+            opacity: 0.85;
             transition: background-color 0.3s ease;
         }
 
+        /* Text Area: Fixed Height */
         .forecast-time {
-            /* Fixed height for label area */
-            height: 55px; 
-            width: 20px;
-            
-            font-size: 10px;
-            color: var(--text-secondary);
-            text-align: right; 
-            white-space: nowrap;
-            
-            /* Center the text wrapper */
+            height: 60px; /* Fixed height for label area */
+            min-height: 60px;
+            width: 100%;
             display: flex;
-            align-items: flex-start; 
+            align-items: center;
             justify-content: center;
-            padding-top: 5px;
+            /* overflow: visible;  <-- IMPORTANT: Allow text to exceed container width before rotation */
         }
         
         .forecast-time span {
-            transform: rotate(90deg); /* Standard rotation */
-            transform-origin: center top;
             display: block;
-            margin-top: 5px; /* Push down slightly */
+            width: 60px; /* Give text plenty of layout width */
+            text-align: center;
+            font-size: 10px;
+            color: var(--text-secondary);
+            transform: rotate(-90deg); /* Rotate CCW to read up */
+            white-space: nowrap;
         }
 
 
@@ -551,7 +555,7 @@
                     ? `<svg class="location-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"></path></svg>` 
                     : '';
 
-                // Build Forecast Chart HTML
+                // Build Forecast Chart HTML with strict wrapper
                 const barsHtml = loc.forecast.map((d, i) => {
                     let col = "var(--aqi-good)";
                     if (d.val > 50) col = "var(--aqi-moderate)";
@@ -575,7 +579,9 @@
 
                     return `
                         <div class="forecast-column">
-                            <div class="forecast-bar" style="height: ${h}%; background-color: ${col};"></div>
+                            <div class="forecast-bar-area">
+                                <div class="forecast-bar" style="height: ${h}%; background-color: ${col};"></div>
+                            </div>
                             <div class="forecast-time"><span>${timeLabel}</span></div>
                         </div>
                     `;
