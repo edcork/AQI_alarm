@@ -1,4 +1,5 @@
 :root {
+    /* DEFAULT DARK MODE VARIABLES */
     --bg-color: #000000;
     --card-bg: #1C1C1E;
     --text-primary: #FFFFFF;
@@ -12,6 +13,17 @@
     --aqi-good: #30D158;
     --input-bg: #2C2C2E;
     --separator-color: #3A3A3C;
+}
+
+/* LIGHT MODE OVERRIDES */
+[data-theme="light"] {
+    --bg-color: #F2F2F7;       /* iOS System Gray 6 */
+    --card-bg: #FFFFFF;        /* Pure White */
+    --text-primary: #000000;
+    --text-secondary: #8E8E93; /* Stays same or #3C3C43 */
+    --input-bg: #E5E5EA;       /* iOS System Gray 5 */
+    --separator-color: #C6C6C8;
+    /* Semantic colors remain mostly the same, just legible on white */
 }
 
 body {
@@ -53,8 +65,15 @@ body {
 /* --- TOP DASHBOARD --- */
 #aqi-area {
     flex: 5; position: relative;
-    background: linear-gradient(180deg, #1c1c1e 0%, #000000 100%);
-    border-bottom: 1px solid #333; overflow: hidden; display: flex; flex-direction: column;
+    /* Use variables for gradient to support light mode if needed, 
+       but for now we keep the 'Night' vibe or switch to a light gradient?
+       Let's stick to the variable colors to ensure it switches. 
+       We redefine the background to use the variable. */
+    background: var(--bg-color); 
+    /* Optional: If you want a gradient in light mode, you'd need more vars. 
+       For now, flat bg is cleaner for light mode. */
+    border-bottom: 1px solid var(--separator-color); 
+    overflow: hidden; display: flex; flex-direction: column;
 }
 #dashboard-slider { display: flex; width: 100%; height: 100%; transition: transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1); }
 .dashboard-slide { min-width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; text-align: center; padding-top: 50px; box-sizing: border-box; }
@@ -67,25 +86,17 @@ body {
 
 /* --- FORECAST CHART --- */
 .forecast-title { width: 100%; text-align: center; font-size: 12px; color: var(--text-secondary); font-weight: 600; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; }
-
-/* UPDATED: Increased height to 100px to fit larger icon */
 .forecast-container { width: 90%; height: 100px; display: flex; justify-content: space-between; margin-bottom: 25px; }
-
 .forecast-column { display: flex; flex-direction: column; flex: 1; height: 100%; align-items: center; position: relative; }
-
-/* UPDATED: Increased height to 22px */
 .forecast-icon-area { height: 22px; width: 100%; display: flex; align-items: center; justify-content: center; margin-bottom: 2px; }
-
-/* UPDATED: Increased size by 50% */
 .alarm-marker-icon { width: 90%; height: auto; max-height: 21px; fill: var(--text-primary); opacity: 0.9; }
-
 .forecast-bar-area { height: 30px; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
 .forecast-bar { width: 60%; max-width: 8px; border-radius: 2px; opacity: 0.85; transition: height 0.3s ease, background-color 0.3s ease; }
 .forecast-time { height: 40px; width: 100%; position: relative; }
 .forecast-time span { position: absolute; left: 50%; top: 5px; transform: translateX(-50%); font-size: 10px; color: var(--text-secondary); white-space: nowrap; }
 .pagination-dots { position: absolute; bottom: 15px; left: 0; right: 0; display: flex; justify-content: center; gap: 8px; }
-.dot { width: 6px; height: 6px; border-radius: 50%; background-color: #555; transition: background-color 0.2s; }
-.dot.active { background-color: white; }
+.dot { width: 6px; height: 6px; border-radius: 50%; background-color: var(--text-secondary); transition: background-color 0.2s; }
+.dot.active { background-color: var(--text-primary); }
 
 /* --- ALARMS LIST --- */
 #alarms-area { flex: 5; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; overflow-x: hidden; }
@@ -152,20 +163,20 @@ body {
 
 .switch { position: relative; display: inline-block; width: 50px; height: 30px; flex-shrink: 0;}
 .switch input { opacity: 0; width: 0; height: 0; }
-.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #3a3a3c; transition: .4s; border-radius: 34px; }
+.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--separator-color); transition: .4s; border-radius: 34px; }
 .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
 input:checked + .slider { background-color: var(--success-color); }
 input:checked + .slider:before { transform: translateX(20px); }
 
 /* --- BUTTONS --- */
 .btn-pill {
-    background-color: var(--card-bg); color: var(--accent-color); border: 1px solid #333;
+    background-color: var(--card-bg); color: var(--accent-color); border: 1px solid var(--separator-color);
     padding: 15px 30px; border-radius: 25px; font-size: 16px; font-weight: 600; cursor: pointer;
     text-align: center; transition: background-color 0.2s; flex-shrink: 0; min-width: 100px;
 }
-.btn-pill:active { background-color: #333; }
+.btn-pill:active { background-color: var(--input-bg); }
 .btn-pill.primary { color: var(--accent-color); }
-.btn-pill.cancel { color: var(--danger-color); border-color: #333; }
+.btn-pill.cancel { color: var(--danger-color); border-color: var(--separator-color); }
 .btn-add-main { align-self: center; margin-top: 20px; margin-bottom: 30px; width: auto; padding: 15px 40px; }
 
 /* --- MODALS --- */
@@ -189,13 +200,13 @@ input:checked + .slider:before { transform: translateX(20px); }
 .modal-header { font-size: 20px; font-weight: 700; margin-bottom: 20px; text-align: center; }
 .form-group { margin-bottom: 15px; position: relative; }
 .form-label { display: block; font-size: 14px; color: var(--text-secondary); margin-bottom: 8px; }
-.form-input, .form-select { width: 100%; background-color: var(--input-bg); color: white; border: none; padding: 12px; border-radius: 10px; font-size: 16px; box-sizing: border-box; appearance: none; -webkit-appearance: none; }
+.form-input, .form-select { width: 100%; background-color: var(--input-bg); color: var(--text-primary); border: none; padding: 12px; border-radius: 10px; font-size: 16px; box-sizing: border-box; appearance: none; -webkit-appearance: none; }
 .form-select { background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%230A84FF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E"); background-repeat: no-repeat; background-position: right 15px top 50%; background-size: 12px auto; }
 .input-group-row { display: flex; gap: 10px; } .input-group-row .form-select { flex: 1; } .input-group-row .form-input { flex: 1; }
 
 /* --- DAY SELECTOR --- */
 .day-selector { display: flex; justify-content: space-between; width: 100%; margin-top: 5px; }
-.day-btn { width: 35px; height: 35px; border-radius: 50%; border: 1px solid #333; background: var(--input-bg); color: var(--text-secondary); font-size: 14px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+.day-btn { width: 35px; height: 35px; border-radius: 50%; border: 1px solid var(--separator-color); background: var(--input-bg); color: var(--text-secondary); font-size: 14px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
 .day-btn.selected { background-color: var(--accent-color); color: white; border-color: var(--accent-color); font-weight: 700; }
 
 /* MODAL ACTION BAR */
@@ -216,4 +227,4 @@ input:checked + .slider:before { transform: translateX(20px); }
 .settings-label { font-size: 16px; }
 .settings-delete-btn { color: var(--danger-color); background: none; border: none; font-size: 16px; font-weight: 500; cursor: pointer; }
 .settings-arrow { color: var(--text-secondary); font-size: 18px; font-weight: 400; }
-.settings-select { width: auto; padding: 5px 25px 5px 10px; height: 32px; background-position: right 5px center; text-align: right; text-align-last: right; direction: ltr; }
+.settings-select { width: auto; padding: 5px 25px 5px 10px; height: 32px; background-position: right 5px center; text-align: right; text-align-last: right; direction: ltr; color: var(--text-secondary); }

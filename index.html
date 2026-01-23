@@ -61,6 +61,13 @@
                 <div class="settings-section-title">General</div>
                 <div class="settings-list">
                     <div class="settings-row">
+                        <span class="settings-label">Theme</span>
+                        <select id="setting-theme" class="form-select settings-select" onchange="updateTheme(this.value)">
+                            <option value="dark" selected>Dark</option>
+                            <option value="light">Light</option>
+                        </select>
+                    </div>
+                    <div class="settings-row">
                         <span class="settings-label">AQI Standard</span>
                         <select id="setting-aqi-std" class="form-select settings-select" onchange="updateAQIStandard(this.value)">
                             <option value="US" selected>US (EPA)</option>
@@ -128,7 +135,7 @@
             </div>
             
             <div style="text-align: center; margin-top: 30px; color: var(--text-secondary); font-size: 13px;">
-                AQI Alarm v0.6<br>Powered by Open-Meteo
+                AQI Alarm v0.7<br>Powered by Open-Meteo
             </div>
         </div>
     </div>
