@@ -328,14 +328,10 @@ function closeAddMenu() { document.getElementById('menu-modal').style.display = 
 function selectMenuOption(opt) { closeAddMenu(); opt === 'alarm' ? openAddAlarm() : openLocationSearch(); }
 
 function openAddAlarm() {
-    // 1. Reset Arrays & UI
     selectedDays = ["Never"]; 
     updateRepeatUI();
-    
-    // 2. Refresh Dropdown (crucial so it isn't empty)
     updateLocationDropdown();
     
-    // 3. Reset Values explicitly
     document.getElementById('new-time').value = "07:00";
     document.getElementById('new-label').value = ""; 
     document.getElementById('new-aqi').value = "100";
@@ -343,7 +339,6 @@ function openAddAlarm() {
     document.getElementById('new-sound').value = "radar";
     document.getElementById('repeat-wrapper').classList.remove('open');
     
-    // Select the first location by default if exists
     const locSelect = document.getElementById('new-location-select');
     if (locSelect.options.length > 0) locSelect.selectedIndex = 0;
 
@@ -386,7 +381,6 @@ function saveAlarm() {
         sound: document.getElementById('new-sound').value,
         active: true 
     });
-    // Renders updates in bg
     renderAlarms(); 
     renderDashboard(); 
     closeAddAlarm();
