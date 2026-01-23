@@ -5,6 +5,7 @@ let timeFormat = "24h";
 let currentAQIStandard = "US";
 let locations = [];
 let currentLocIndex = 0;
+let tempSelectedLocation = null; // Stores user selection before saving
 
 // Open-Meteo Endpoints
 const API = {
@@ -16,28 +17,27 @@ const API = {
 async function initData() {
     // Add default location if empty (e.g. Shanghai)
     if (locations.length === 0) {
-        await addLocationByCity("Shanghai", true);
+        // We bypass the selection logic for the init
+        await fetchAndAddLocation("Shanghai", true);
     }
 }
 
 // --- UTILITY: CALCULATE AQI ---
-// Converts raw PM2.5 (µg/m³) to AQI based on standard
 function calculateAQI(pm25, standard = 'US') {
-    // Breakpoints: [ConcentrationLow, ConcentrationHigh, IndexLow, IndexHigh]
     const breakpoints = {
-        'US': [ // EPA
+        'US': [
             [0.0, 12.0, 0, 50], [12.1, 35.4, 51, 100], [35.5, 55.4, 101, 150],
             [55.5, 150.4, 151, 200], [150.5, 250.4, 201, 300], [250.5, 350.4, 301, 400], [350.5, 500.4, 401, 500]
         ],
-        'CN': [ // China MEP
+        'CN': [
             [0, 35, 0, 50], [35, 75, 51, 100], [75, 115, 101, 150],
             [115, 150, 151, 200], [150, 250, 201, 300], [250, 350, 301, 400], [350, 500, 401, 500]
         ],
-        'UK': [ // UK DAQI (Scaled x50 for display consistency, normally 1-10)
+        'UK': [
             [0, 11, 0, 50], [12, 23, 51, 100], [24, 35, 101, 150], [36, 41, 151, 200],
             [42, 53, 201, 300], [54, 70, 301, 400], [71, 1000, 401, 500]
         ],
-        'IN': [ // India NAQI
+        'IN': [
             [0, 30, 0, 50], [31, 60, 51, 100], [61, 90, 101, 200],
             [91, 120, 201, 300], [121, 250, 301, 400], [250, 999, 401, 500]
         ]
@@ -50,7 +50,7 @@ function calculateAQI(pm25, standard = 'US') {
             return Math.round(((iHigh - iLow) / (cHigh - cLow)) * (pm25 - cLow) + iLow);
         }
     }
-    return 500; // Cap at max
+    return 500;
 }
 
 function getStatus(aqi) {
@@ -73,31 +73,72 @@ function getColor(aqi) {
 
 // --- DATA FETCHING (OPEN-METEO) ---
 
-async function addLocationByCity(cityName, isCurrent = false) {
-    try {
-        // 1. Geocode
-        const geoRes = await fetch(`${API.GEO}?name=${cityName}&count=1&language=en&format=json`);
-        const geoData = await geoRes.json();
-        
-        if (!geoData.results || geoData.results.length === 0) {
-            alert("Location not found");
-            return;
-        }
-        
-        const loc = geoData.results[0];
-        const lat = loc.latitude;
-        const lon = loc.longitude;
+// Search
+let searchTimeout;
+function handleSearch(e) {
+    const val = e.target.value;
+    const resultsDiv = document.getElementById('search-results');
+    // Clear selection
+    tempSelectedLocation = null; 
+    
+    clearTimeout(searchTimeout);
+    if (val.length < 3) { resultsDiv.innerHTML = ""; return; }
 
-        // 2. Fetch Air Quality (Current + Forecast)
-        // We fetch PM2.5 to calculate AQI locally
+    searchTimeout = setTimeout(async () => {
+        try {
+            const res = await fetch(`${API.GEO}?name=${val}&count=5&language=en&format=json`);
+            const data = await res.json();
+            if(data.results) {
+                resultsDiv.innerHTML = data.results.map((city, index) => `
+                    <div id="search-item-${index}" class="search-item" onclick="selectLocation(${index}, '${city.name.replace(/'/g, "\\'")}', ${city.latitude}, ${city.longitude})">
+                        <div class="search-item-city">${city.name}</div>
+                        <div class="search-item-country">${city.country}</div>
+                    </div>
+                `).join('');
+            }
+        } catch(e) { console.log(e); }
+    }, 500);
+}
+
+// User clicks a result in the list
+function selectLocation(index, name, lat, lon) {
+    // 1. Visually highlight
+    document.querySelectorAll('.search-item').forEach(el => el.classList.remove('selected'));
+    document.getElementById(`search-item-${index}`).classList.add('selected');
+    
+    // 2. Store data
+    tempSelectedLocation = { name, lat, lon };
+}
+
+// User clicks "Save" on Location Modal
+async function confirmAddLocation() {
+    if (!tempSelectedLocation) {
+        alert("Please select a location first.");
+        return;
+    }
+    await fetchAndAddLocation(tempSelectedLocation.name, false, tempSelectedLocation.lat, tempSelectedLocation.lon);
+    closeLocationSearch();
+}
+
+// Core Fetch Logic
+async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
+    try {
+        // If lat/lon provided (from click), use them. If not (from Init), fetch them.
+        if (lat === null || lon === null) {
+            const geoRes = await fetch(`${API.GEO}?name=${name}&count=1&language=en&format=json`);
+            const geoData = await geoRes.json();
+            if (!geoData.results || geoData.results.length === 0) return;
+            lat = geoData.results[0].latitude;
+            lon = geoData.results[0].longitude;
+            name = geoData.results[0].name;
+        }
+
         const airRes = await fetch(`${API.AIR}?latitude=${lat}&longitude=${lon}&current=pm2_5,pm10,nitrogen_dioxide,ozone&hourly=pm2_5`);
         const airData = await airRes.json();
 
-        // Process Data
         const currentPM25 = airData.current.pm2_5;
         const calculatedAQI = calculateAQI(currentPM25, currentAQIStandard);
         
-        // Process Forecast (Next 24h)
         const hourlyPM25 = airData.hourly.pm2_5;
         const currentHourIndex = new Date().getHours(); 
         
@@ -114,15 +155,14 @@ async function addLocationByCity(cityName, isCurrent = false) {
         }
 
         const newLoc = {
-            name: loc.name,
+            name: name,
             aqi: calculatedAQI,
             status: getStatus(calculatedAQI),
-            pollutant: "PM2.5", // Defaulting to PM2.5 as primary driver
+            pollutant: "PM2.5",
             time: "Now",
             isCurrent: isCurrent,
             color: getColor(calculatedAQI),
             forecast: forecastData,
-            rawForecast: hourlyPM25, // Keep raw for standard switching
             lat: lat,
             lon: lon
         };
@@ -160,7 +200,6 @@ function renderDashboard() {
             let col = getColor(d.val);
             const h = Math.min((d.val / 500) * 100, 100);
 
-            // Time label: Every 4th hour
             let timeLabel = "";
             if (i % 4 === 0) { 
                 if (timeFormat === '24h') {
@@ -172,7 +211,6 @@ function renderDashboard() {
                 }
             }
 
-            // Alarm Marker
             const hasActiveAlarm = alarms.some(a => a.active && parseInt(a.time.split(':')[0]) === d.hour);
             const markerHtml = hasActiveAlarm 
                 ? `<svg class="alarm-marker-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M22 5.72l-4.6-3.86-1.29 1.53 4.6 3.86L22 5.72zM7.88 3.39L6.6 1.86 2 5.71l1.29 1.53 4.59-3.85zM12.5 8H11v6l4.75 2.85.75-1.23-4-2.37V8zM12 4c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9-4.03-9-9-9zm0 16c-3.86 0-7-3.14-7-7s3.14-7 7-7 7 3.14 7 7-3.14 7-7 7z"/></svg>` 
@@ -213,14 +251,9 @@ function renderDashboard() {
     renderSettingsLocations();
 }
 
-// --- RECALCULATE ON SETTINGS CHANGE ---
 function updateAQIStandard(newStd) {
     currentAQIStandard = newStd;
-    // Reload logic for real app would go here
-    // For demo, we just alert
 }
-
-// --- SEARCH & UI LOGIC (Menus, Alarms, etc.) ---
 
 function updateTimeFormat(val) { timeFormat = val; renderDashboard(); }
 
@@ -240,63 +273,34 @@ function updateLocationDropdown() {
         locations.filter(l => !l.isCurrent).map(l => `<option value="${l.name}">${l.name}</option>`).join('');
 }
 
-// Search
-let searchTimeout;
-function handleSearch(e) {
-    const val = e.target.value;
-    const resultsDiv = document.getElementById('search-results');
-    clearTimeout(searchTimeout);
-    if (val.length < 3) { resultsDiv.innerHTML = ""; return; }
-
-    searchTimeout = setTimeout(async () => {
-        try {
-            const res = await fetch(`${API.GEO}?name=${val}&count=5&language=en&format=json`);
-            const data = await res.json();
-            if(data.results) {
-                resultsDiv.innerHTML = data.results.map(city => `
-                    <div class="search-item" onclick="addLocationByCity('${city.name}')">
-                        <div class="search-item-city">${city.name}</div>
-                        <div class="search-item-country">${city.country}</div>
-                    </div>
-                `).join('');
-            }
-        } catch(e) { console.log(e); }
-    }, 500);
-}
-
 function closeLocationSearch() { 
     document.getElementById('location-modal').style.display = 'none'; 
 }
 
-// Alarms
 function renderAlarms() {
     const listContainer = document.getElementById('alarm-list-container');
-    if (alarms.length === 0) {
-        listContainer.innerHTML = '';
-    } else {
-        listContainer.innerHTML = alarms.map((alarm, index) => {
-            const cond = alarm.conditions[0];
-            const op = cond.operator === 'gt' ? '>' : '<';
-            return `
-            <div class="alarm-container">
-                <div class="alarm-delete-bg" onclick="deleteAlarm(${index})">Delete</div>
-                <div class="alarm-row-content" id="row-${index}"
-                        ontouchstart="handleTouchStart(event, ${index})"
-                        ontouchmove="handleTouchMove(event, ${index})"
-                        ontouchend="handleTouchEnd(event, ${index})">
-                    <div class="alarm-info">
-                        <div class="alarm-top-line"><span class="alarm-time">${alarm.time}</span><span class="alarm-condition">AQI ${op} ${cond.value}</span></div>
-                        ${alarm.label ? `<div class="alarm-label">${alarm.label}</div>` : ''}
-                        <div class="alarm-details">${alarm.location} • ${formatDays(alarm.repeat)}</div>
-                    </div>
-                    <label class="switch">
-                        <input type="checkbox" ${alarm.active ? 'checked' : ''} onchange="toggleAlarm(${index})">
-                        <span class="slider"></span>
-                    </label>
+    listContainer.innerHTML = alarms.map((alarm, index) => {
+        const cond = alarm.conditions[0];
+        const op = cond.operator === 'gt' ? '>' : '<';
+        return `
+        <div class="alarm-container">
+            <div class="alarm-delete-bg" onclick="deleteAlarm(${index})">Delete</div>
+            <div class="alarm-row-content" id="row-${index}"
+                    ontouchstart="handleTouchStart(event, ${index})"
+                    ontouchmove="handleTouchMove(event, ${index})"
+                    ontouchend="handleTouchEnd(event, ${index})">
+                <div class="alarm-info">
+                    <div class="alarm-top-line"><span class="alarm-time">${alarm.time}</span><span class="alarm-condition">AQI ${op} ${cond.value}</span></div>
+                    ${alarm.label ? `<div class="alarm-label">${alarm.label}</div>` : ''}
+                    <div class="alarm-details">${alarm.location} • ${formatDays(alarm.repeat)}</div>
                 </div>
+                <label class="switch">
+                    <input type="checkbox" ${alarm.active ? 'checked' : ''} onchange="toggleAlarm(${index})">
+                    <span class="slider"></span>
+                </label>
             </div>
-        `}).join('');
-    }
+        </div>
+    `}).join('');
 }
 
 let listStartX = 0, currentSwipeIndex = -1;
@@ -314,7 +318,6 @@ function handleTouchEnd(e, index) {
 function deleteAlarm(index) { alarms.splice(index, 1); renderAlarms(); renderDashboard(); }
 function formatDays(days) { return days.includes("Never") ? "Once" : (days.length === 7 ? "Daily" : days.map(d => d.slice(0, 3)).join(", ")); }
 
-// Menus
 function openSettings() { renderSettingsLocations(); document.getElementById('settings-modal').style.display = 'flex'; }
 function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
 function openAddMenu() { document.getElementById('menu-modal').style.display = 'block'; }

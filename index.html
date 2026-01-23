@@ -33,7 +33,7 @@
     <section id="alarms-area">
         <div class="section-title">Alarms</div>
         <div id="alarm-list-container"></div>
-        <button class="btn-add-alarm-large" onclick="openAddAlarm()">+ Add</button>
+        <button class="btn-pill btn-add-main" onclick="openAddAlarm()">+ Add</button>
     </section>
 
     <div id="menu-modal" class="menu-overlay" onclick="closeAddMenu()">
@@ -64,22 +64,65 @@
                         </select>
                     </div>
                     <div class="settings-row">
+                        <span class="settings-label">Temperature Unit</span>
+                        <select class="form-select settings-select">
+                            <option>Celsius</option>
+                            <option>Fahrenheit</option>
+                        </select>
+                    </div>
+                    <div class="settings-row">
                         <span class="settings-label">Time Format</span>
                         <select id="setting-time-fmt" class="form-select settings-select" onchange="updateTimeFormat(this.value)">
                             <option value="24h" selected>24 Hour</option>
                             <option value="12h">12 Hour</option>
                         </select>
                     </div>
+                    <div class="settings-row">
+                        <span class="settings-label">Language</span>
+                        <select class="form-select settings-select">
+                            <option>English</option>
+                            <option disabled>Coming soon...</option>
+                        </select>
+                    </div>
                 </div>
+            </div>
+
+            <div class="settings-section">
+                <div class="settings-section-title">Notifications</div>
+                <div class="settings-list">
+                    <div class="settings-row">
+                        <span class="settings-label">Critical Alerts</span>
+                        <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+                    </div>
+                </div>
+                <div style="font-size: 13px; color: var(--text-secondary); margin: 5px 0 0 15px;">Sounds alarm even if Do Not Disturb is on.</div>
             </div>
 
             <div class="settings-section">
                 <div class="settings-section-title">Locations</div>
                 <div class="settings-list" id="settings-location-list"></div>
             </div>
+
+            <div class="settings-section">
+                <div class="settings-section-title">About</div>
+                <div class="settings-list">
+                    <div class="settings-row" onclick="alert('Contact Us clicked')">
+                        <span class="settings-label">Contact us</span>
+                        <span class="settings-arrow">›</span>
+                    </div>
+                    <div class="settings-row" onclick="alert('Privacy Policy clicked')">
+                        <span class="settings-label">Privacy policy</span>
+                        <span class="settings-arrow">›</span>
+                    </div>
+                    <div class="settings-row" onclick="alert('System Permissions clicked')">
+                        <span class="settings-label">System permissions</span>
+                        <span class="settings-arrow">›</span>
+                    </div>
+                </div>
+            </div>
             
             <div style="text-align: center; margin-top: 30px; color: var(--text-secondary); font-size: 13px;">
-                AQI Alarm v0.5.1<br>Powered by Open-Meteo
+                AQI Alarm v0.5.2<br>Powered by Open-Meteo
             </div>
         </div>
     </div>
@@ -137,21 +180,24 @@
                 </select>
             </div>
             <div class="modal-actions">
-                <button class="btn-modal btn-cancel" onclick="closeAddAlarm()">Cancel</button>
-                <button class="btn-modal btn-save" onclick="saveAlarm()">Save</button>
+                <button class="btn-pill cancel" onclick="closeAddAlarm()">Cancel</button>
+                <button class="btn-pill primary" onclick="saveAlarm()">Save</button>
             </div>
         </div>
     </div>
 
     <div id="location-modal" class="modal-overlay">
         <div class="modal-full-screen">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <button style="background:none; border:none; color: var(--accent-color); font-size: 16px;" onclick="closeLocationSearch()">Cancel</button>
+            <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 20px;">
                 <span style="font-weight: 700; font-size: 18px;">Add Location</span>
-                <div style="width: 50px;"></div>
             </div>
             <input type="text" id="loc-search-input" class="form-input" placeholder="Search for a city..." onkeyup="handleSearch(event)">
             <div id="search-results" class="search-results"></div>
+            
+            <div class="modal-actions">
+                <button class="btn-pill cancel" onclick="closeLocationSearch()">Cancel</button>
+                <button class="btn-pill primary" onclick="confirmAddLocation()">Save</button>
+            </div>
         </div>
     </div>
 
