@@ -1,11 +1,12 @@
 // --- CONFIGURATION ---
 let alarms = []; 
-let selectedDays = []; // Changed default: Empty means "Once" (Never) in UI
+let selectedDays = []; 
 let timeFormat = "24h";
 let currentAQIStandard = "US";
 let locations = [];
 let currentLocIndex = 0;
 let tempSelectedLocation = null;
+let editingAlarmIndex = null; // Track which alarm is being edited
 
 // Open-Meteo Endpoints
 const API = {
@@ -74,7 +75,8 @@ function getColor(aqi, standard = 'US') {
     return "#7e0023";
 }
 
-// --- DATA FETCHING ---
+// --- DATA FETCHING (OPEN-METEO) ---
+
 async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
     try {
         if (lat === null || lon === null) {
@@ -90,7 +92,6 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
         const airRes = await fetch(`${API.AIR}?latitude=${lat}&longitude=${lon}&current=pm2_5,pm10,nitrogen_dioxide,ozone&hourly=pm2_5&timezone=${userTimezone}&timeformat=unixtime`);
         const airData = await airRes.json();
 
-        // Data Extraction
         const rawCurrentPM25 = airData.current.pm2_5;
         const rawForecastPM25 = airData.hourly.pm2_5;
         const dateObj = new Date(airData.current.time * 1000);
@@ -250,7 +251,7 @@ function updateTimeFormat(val) {
     refreshAllLocations();
 }
 
-// --- TOUCH HANDLING ---
+// --- PULL TO REFRESH & CAROUSEL ---
 let touchStartY = 0;
 let isRefreshing = false;
 const dashArea = document.getElementById('aqi-area');
@@ -328,11 +329,13 @@ function selectMenuOption(opt) { closeAddMenu(); opt === 'alarm' ? openAddAlarm(
 function openAddAlarm() {
     // 1. Reset Arrays & UI
     selectedDays = []; 
-    // Reset buttons
+    editingAlarmIndex = null; // IMPORTANT: Reset edit mode
+    document.getElementById('modal-title').innerText = "New Alarm";
     document.querySelectorAll('.day-btn').forEach(btn => btn.classList.remove('selected'));
     
     updateLocationDropdown();
     
+    // Reset Form
     document.getElementById('new-time').value = "07:00";
     document.getElementById('new-label').value = ""; 
     document.getElementById('new-aqi').value = "100";
@@ -342,6 +345,32 @@ function openAddAlarm() {
     const locSelect = document.getElementById('new-location-select');
     if (locSelect.options.length > 0) locSelect.selectedIndex = 0;
 
+    document.getElementById('add-modal').style.display = 'flex';
+}
+
+function openEditAlarm(index) {
+    editingAlarmIndex = index;
+    const alarm = alarms[index];
+    
+    document.getElementById('modal-title').innerText = "Edit Alarm";
+    
+    // Populate Form
+    document.getElementById('new-time').value = alarm.time;
+    document.getElementById('new-label').value = alarm.label;
+    document.getElementById('new-location-select').value = alarm.location;
+    document.getElementById('new-aqi-op').value = alarm.conditions[0].operator;
+    document.getElementById('new-aqi').value = alarm.conditions[0].value;
+    document.getElementById('new-sound').value = alarm.sound;
+
+    // Populate Days
+    selectedDays = alarm.repeat.includes("Never") ? [] : [...alarm.repeat];
+    document.querySelectorAll('.day-btn').forEach(btn => {
+        const day = btn.getAttribute('data-day');
+        if (selectedDays.includes(day)) btn.classList.add('selected');
+        else btn.classList.remove('selected');
+    });
+
+    closeAddMenu(); // Close the menu if open (rare case)
     document.getElementById('add-modal').style.display = 'flex';
 }
 
@@ -371,20 +400,41 @@ function renderSettingsLocations() {
         `).join('');
     }
 }
+
 function saveAlarm() {
-    alarms.push({ 
-        time: document.getElementById('new-time').value, 
+    // Validation
+    const timeVal = document.getElementById('new-time').value;
+    const aqiVal = document.getElementById('new-aqi').value;
+    const locVal = document.getElementById('new-location-select').value;
+
+    if (!timeVal || !aqiVal) {
+        alert("Please set a time and AQI threshold.");
+        return;
+    }
+
+    const alarmData = { 
+        time: timeVal, 
         label: document.getElementById('new-label').value, 
-        location: document.getElementById('new-location-select').value, 
-        conditions: [{ metric: 'aqi', operator: document.getElementById('new-aqi-op').value, value: document.getElementById('new-aqi').value }], 
-        repeat: selectedDays.length === 0 ? ["Never"] : [...selectedDays], // Fix empty array = Never
+        location: locVal, 
+        conditions: [{ metric: 'aqi', operator: document.getElementById('new-aqi-op').value, value: aqiVal }], 
+        repeat: selectedDays.length === 0 ? ["Never"] : [...selectedDays], 
         sound: document.getElementById('new-sound').value,
         active: true 
-    });
+    };
+
+    if (editingAlarmIndex !== null) {
+        // Update Existing
+        alarms[editingAlarmIndex] = alarmData;
+    } else {
+        // Create New
+        alarms.push(alarmData);
+    }
+
     renderAlarms(); 
     renderDashboard(); 
     closeAddAlarm();
 }
+
 function toggleAlarm(index) { alarms[index].active = !alarms[index].active; renderDashboard(); }
 
 // --- NEW DAY TOGGLE LOGIC ---
@@ -399,6 +449,7 @@ function toggleDay(btn) {
     }
 }
 
+// --- ALARM LIST & SWIPE LOGIC ---
 function renderAlarms() {
     const listContainer = document.getElementById('alarm-list-container');
     listContainer.innerHTML = alarms.map((alarm, index) => {
@@ -406,11 +457,16 @@ function renderAlarms() {
         const op = cond.operator === 'gt' ? '>' : '<';
         return `
         <div class="alarm-container">
-            <div class="alarm-delete-bg" onclick="deleteAlarm(${index})">Delete</div>
+            <div class="alarm-swipe-actions">
+                <button class="swipe-btn edit" onclick="openEditAlarm(${index})">Edit</button>
+                <button class="swipe-btn delete" onclick="deleteAlarm(${index})">
+                    <svg class="trash-icon" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                </button>
+            </div>
             <div class="alarm-row-content" id="row-${index}"
-                    ontouchstart="handleTouchStart(event, ${index})"
-                    ontouchmove="handleTouchMove(event, ${index})"
-                    ontouchend="handleTouchEnd(event, ${index})">
+                    ontouchstart="handleAlarmTouchStart(event, ${index})"
+                    ontouchmove="handleAlarmTouchMove(event, ${index})"
+                    ontouchend="handleAlarmTouchEnd(event, ${index})">
                 <div class="alarm-info">
                     <div class="alarm-top-line"><span class="alarm-time">${alarm.time}</span><span class="alarm-condition">AQI ${op} ${cond.value}</span></div>
                     ${alarm.label ? `<div class="alarm-label">${alarm.label}</div>` : ''}
@@ -424,7 +480,46 @@ function renderAlarms() {
         </div>
     `}).join('');
 }
-function deleteAlarm(index) { alarms.splice(index, 1); renderAlarms(); renderDashboard(); }
+
+let alarmTouchStartX = 0;
+let alarmCurrentSwipeIndex = -1;
+
+function handleAlarmTouchStart(e, index) {
+    alarmTouchStartX = e.touches[0].clientX;
+    alarmCurrentSwipeIndex = index;
+    // Close others
+    document.querySelectorAll('.alarm-row-content').forEach(row => {
+        if(row.id !== `row-${index}`) row.style.transform = `translateX(0px)`;
+    });
+}
+
+function handleAlarmTouchMove(e, index) {
+    if (alarmCurrentSwipeIndex !== index) return;
+    const diff = e.touches[0].clientX - alarmTouchStartX;
+    const row = document.getElementById(`row-${index}`);
+    // Allow swipe left (negative diff), cap at -150px (approx button width)
+    if (diff < 0 && diff > -160) {
+        row.style.transform = `translateX(${diff}px)`;
+    }
+}
+
+function handleAlarmTouchEnd(e, index) {
+    const row = document.getElementById(`row-${index}`);
+    const diff = e.changedTouches[0].clientX - alarmTouchStartX;
+    // Threshold to snap open
+    if (diff < -60) {
+        row.style.transform = `translateX(-150px)`; // Snap open to reveal 2 buttons
+    } else {
+        row.style.transform = `translateX(0px)`; // Snap close
+    }
+}
+
+function deleteAlarm(index) { 
+    alarms.splice(index, 1); 
+    renderAlarms(); 
+    renderDashboard(); 
+}
+
 function formatDays(days) { return days.includes("Never") ? "Once" : (days.length === 7 ? "Daily" : days.map(d => d.slice(0, 3)).join(", ")); }
 
 initData();
