@@ -117,68 +117,51 @@ input:checked + .slider:before { transform: translateX(20px); }
 .action-btn { width: 100%; padding: 15px 20px; background: none; border: none; border-bottom: 1px solid var(--separator-color); color: var(--accent-color); font-size: 16px; cursor: pointer; text-align: left; }
 .action-btn:last-child { border-bottom: none; }
 
-/* MODAL CONTENT with Sticky Footer Logic */
 .modal-content { 
     background-color: var(--card-bg); width: 100%; max-width: 600px; 
     border-top-left-radius: 20px; border-top-right-radius: 20px; 
     padding: 25px; box-sizing: border-box; animation: slideUp 0.3s ease-out; 
-    max-height: 90vh; 
-    display: flex; flex-direction: column; 
-    position: relative; /* Context for children */
+    max-height: 90vh; display: flex; flex-direction: column; position: relative; 
 }
-
-/* Add a scrollable area for form fields */
-.modal-body {
-    overflow-y: auto;
-    flex: 1; /* Takes available space */
-    padding-bottom: 20px;
-}
+.modal-body { overflow-y: auto; flex: 1; padding-bottom: 20px; } /* Scrollable Area */
 
 .modal-full-screen { background-color: var(--bg-color); width: 100%; height: 100%; display: flex; flex-direction: column; animation: slideUp 0.3s ease-out; padding: 20px; box-sizing: border-box; overflow-y: auto; }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
 .modal-header { font-size: 20px; font-weight: 700; margin-bottom: 20px; text-align: center; }
-.form-group { margin-bottom: 15px; position: relative; } /* Added relative for dropdown context */
+.form-group { margin-bottom: 15px; position: relative; }
 .form-label { display: block; font-size: 14px; color: var(--text-secondary); margin-bottom: 8px; }
 .form-input, .form-select { width: 100%; background-color: var(--input-bg); color: white; border: none; padding: 12px; border-radius: 10px; font-size: 16px; box-sizing: border-box; appearance: none; -webkit-appearance: none; }
 .form-select { background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%230A84FF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E"); background-repeat: no-repeat; background-position: right 15px top 50%; background-size: 12px auto; }
 .input-group-row { display: flex; gap: 10px; } .input-group-row .form-select { flex: 1; } .input-group-row .form-input { flex: 1; }
 
-/* --- CUSTOM SELECT (FIXED) --- */
-.custom-select-wrapper { 
-    background-color: var(--input-bg); 
-    border-radius: 10px; 
-    position: relative; /* Anchor for absolute child */
-}
-.custom-select-trigger { padding: 12px; font-size: 16px; color: var(--text-primary); cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
-.custom-select-trigger::after { content: ''; width: 12px; height: 12px; background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%230A84FF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E"); background-repeat: no-repeat; background-size: contain; transition: transform 0.2s; }
-.custom-select-wrapper.open .custom-select-trigger::after { transform: rotate(180deg); }
-
-.custom-options { 
-    display: none; 
-    position: absolute; 
-    top: 100%; left: 0; right: 0; 
-    z-index: 999; /* Ensure it floats on top */
-    background-color: var(--input-bg);
-    border: 1px solid var(--separator-color);
-    border-radius: 10px;
+/* --- NEW: DAY SELECTOR BUTTONS --- */
+.day-selector {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
     margin-top: 5px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.8);
-    max-height: 200px;
-    overflow-y: auto;
 }
-.custom-select-wrapper.open .custom-options { display: block; }
-.custom-option { padding: 12px 15px; border-bottom: 1px solid var(--separator-color); cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 15px; }
-.custom-option.selected { color: var(--accent-color); background-color: rgba(10, 132, 255, 0.1); }
-.custom-option.selected::after { content: '✓'; font-weight: bold; }
+.day-btn {
+    width: 35px; height: 35px;
+    border-radius: 50%;
+    border: 1px solid #333;
+    background: var(--input-bg);
+    color: var(--text-secondary);
+    font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.day-btn.selected {
+    background-color: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+    font-weight: 700;
+}
 
 /* MODAL ACTION BAR */
-.modal-actions { 
-    display: flex; gap: 15px; margin-top: 20px; width: 100%; justify-content: center;
-    /* Sticky footer logic if content is long */
-    padding-top: 10px;
-    border-top: 1px solid transparent; 
-}
+.modal-actions { display: flex; gap: 15px; margin-top: 20px; width: 100%; justify-content: center; padding-top: 10px; border-top: 1px solid transparent; }
 #location-modal .modal-actions { position: absolute; bottom: 30px; left: 20px; right: 20px; width: auto; }
 
 .search-results { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; max-height: calc(100vh - 200px); }

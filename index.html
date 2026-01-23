@@ -128,7 +128,7 @@
             </div>
             
             <div style="text-align: center; margin-top: 30px; color: var(--text-secondary); font-size: 13px;">
-                AQI Alarm v0.5.4<br>Powered by Open-Meteo
+                AQI Alarm v0.5.5<br>Powered by Open-Meteo
             </div>
         </div>
     </div>
@@ -136,54 +136,52 @@
     <div id="add-modal" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">New Alarm</div>
-            <div class="form-group">
-                <label class="form-label">Time</label>
-                <input type="time" id="new-time" class="form-input" value="07:00">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Label</label>
-                <input type="text" id="new-label" class="form-input" placeholder="e.g. Morning Run">
-            </div>
-            <div class="form-group">
-                <label class="form-label">AQI Threshold</label>
-                <div class="input-group-row">
-                    <select id="new-aqi-op" class="form-select">
-                        <option value="lt" selected>Below</option>
-                        <option value="gt">Above</option>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Time</label>
+                    <input type="time" id="new-time" class="form-input" value="07:00">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Label</label>
+                    <input type="text" id="new-label" class="form-input" placeholder="e.g. Morning Run">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">AQI Threshold</label>
+                    <div class="input-group-row">
+                        <select id="new-aqi-op" class="form-select">
+                            <option value="lt" selected>Below</option>
+                            <option value="gt">Above</option>
+                        </select>
+                        <input type="number" id="new-aqi" class="form-input" value="100" placeholder="150">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Location of reading</label>
+                    <select id="new-location-select" class="form-select"></select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Repeat</label>
+                    <div class="day-selector">
+                        <button class="day-btn" data-day="Sundays" onclick="toggleDay(this)">S</button>
+                        <button class="day-btn" data-day="Mondays" onclick="toggleDay(this)">M</button>
+                        <button class="day-btn" data-day="Tuesdays" onclick="toggleDay(this)">T</button>
+                        <button class="day-btn" data-day="Wednesdays" onclick="toggleDay(this)">W</button>
+                        <button class="day-btn" data-day="Thursdays" onclick="toggleDay(this)">T</button>
+                        <button class="day-btn" data-day="Fridays" onclick="toggleDay(this)">F</button>
+                        <button class="day-btn" data-day="Saturdays" onclick="toggleDay(this)">S</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Sound</label>
+                    <select id="new-sound" class="form-select">
+                        <option value="radar">Radar (Default)</option>
+                        <option value="beacon">Beacon</option>
+                        <option value="chime">Chime</option>
+                        <option value="siren">Siren</option>
                     </select>
-                    <input type="number" id="new-aqi" class="form-input" value="100" placeholder="150">
                 </div>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Location of reading</label>
-                <select id="new-location-select" class="form-select"></select>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Repeat</label>
-                <div class="custom-select-wrapper" id="repeat-wrapper">
-                    <div class="custom-select-trigger" onclick="toggleRepeatDropdown()">
-                        <span id="repeat-text">Never</span>
-                    </div>
-                    <div class="custom-options">
-                        <div class="custom-option selected" data-value="Never" onclick="selectRepeat('Never')">Never</div>
-                        <div class="custom-option" data-value="Mondays" onclick="selectRepeat('Mondays')">Mondays</div>
-                        <div class="custom-option" data-value="Tuesdays" onclick="selectRepeat('Tuesdays')">Tuesdays</div>
-                        <div class="custom-option" data-value="Wednesdays" onclick="selectRepeat('Wednesdays')">Wednesdays</div>
-                        <div class="custom-option" data-value="Thursdays" onclick="selectRepeat('Thursdays')">Thursdays</div>
-                        <div class="custom-option" data-value="Fridays" onclick="selectRepeat('Fridays')">Fridays</div>
-                        <div class="custom-option" data-value="Saturdays" onclick="selectRepeat('Saturdays')">Saturdays</div>
-                        <div class="custom-option" data-value="Sundays" onclick="selectRepeat('Sundays')">Sundays</div>
-                    </div>
-                </div>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Sound</label>
-                <select id="new-sound" class="form-select">
-                    <option value="radar">Radar (Default)</option>
-                    <option value="beacon">Beacon</option>
-                    <option value="chime">Chime</option>
-                    <option value="siren">Siren</option>
-                </select>
             </div>
             <div class="modal-actions">
                 <button class="btn-pill cancel" onclick="closeAddAlarm()">Cancel</button>

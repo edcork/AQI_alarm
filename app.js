@@ -1,6 +1,6 @@
 // --- CONFIGURATION ---
 let alarms = []; 
-let selectedDays = ["Never"];
+let selectedDays = []; // Changed default: Empty means "Once" (Never) in UI
 let timeFormat = "24h";
 let currentAQIStandard = "US";
 let locations = [];
@@ -74,8 +74,7 @@ function getColor(aqi, standard = 'US') {
     return "#7e0023";
 }
 
-// --- DATA FETCHING (OPEN-METEO) ---
-
+// --- DATA FETCHING ---
 async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
     try {
         if (lat === null || lon === null) {
@@ -97,7 +96,6 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
         const dateObj = new Date(airData.current.time * 1000);
         const formattedTime = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: (timeFormat === '12h') });
 
-        // Forecast Data
         const currentHourIndex = new Date().getHours(); 
         const forecastData = [];
         for (let i = 0; i < 24; i++) {
@@ -328,8 +326,11 @@ function closeAddMenu() { document.getElementById('menu-modal').style.display = 
 function selectMenuOption(opt) { closeAddMenu(); opt === 'alarm' ? openAddAlarm() : openLocationSearch(); }
 
 function openAddAlarm() {
-    selectedDays = ["Never"]; 
-    updateRepeatUI();
+    // 1. Reset Arrays & UI
+    selectedDays = []; 
+    // Reset buttons
+    document.querySelectorAll('.day-btn').forEach(btn => btn.classList.remove('selected'));
+    
     updateLocationDropdown();
     
     document.getElementById('new-time').value = "07:00";
@@ -337,7 +338,6 @@ function openAddAlarm() {
     document.getElementById('new-aqi').value = "100";
     document.getElementById('new-aqi-op').value = "lt"; 
     document.getElementById('new-sound').value = "radar";
-    document.getElementById('repeat-wrapper').classList.remove('open');
     
     const locSelect = document.getElementById('new-location-select');
     if (locSelect.options.length > 0) locSelect.selectedIndex = 0;
@@ -377,7 +377,7 @@ function saveAlarm() {
         label: document.getElementById('new-label').value, 
         location: document.getElementById('new-location-select').value, 
         conditions: [{ metric: 'aqi', operator: document.getElementById('new-aqi-op').value, value: document.getElementById('new-aqi').value }], 
-        repeat: [...selectedDays], 
+        repeat: selectedDays.length === 0 ? ["Never"] : [...selectedDays], // Fix empty array = Never
         sound: document.getElementById('new-sound').value,
         active: true 
     });
@@ -386,25 +386,19 @@ function saveAlarm() {
     closeAddAlarm();
 }
 function toggleAlarm(index) { alarms[index].active = !alarms[index].active; renderDashboard(); }
-function toggleRepeatDropdown() { document.getElementById('repeat-wrapper').classList.toggle('open'); }
-function selectRepeat(val) {
-    if (val === "Never") selectedDays = ["Never"];
-    else {
-        if (selectedDays.includes("Never")) selectedDays = [];
-        const idx = selectedDays.indexOf(val);
-        if (idx > -1) selectedDays.splice(idx, 1); else selectedDays.push(val);
-        if (selectedDays.length === 0) selectedDays = ["Never"];
+
+// --- NEW DAY TOGGLE LOGIC ---
+function toggleDay(btn) {
+    const day = btn.getAttribute('data-day');
+    if (selectedDays.includes(day)) {
+        selectedDays = selectedDays.filter(d => d !== day);
+        btn.classList.remove('selected');
+    } else {
+        selectedDays.push(day);
+        btn.classList.add('selected');
     }
-    updateRepeatUI();
 }
-function updateRepeatUI() {
-    document.querySelectorAll('.custom-option').forEach(opt => {
-        opt.classList.toggle('selected', selectedDays.includes(opt.getAttribute('data-value')));
-    });
-    const d = ["Mondays","Tuesdays","Wednesdays","Thursdays","Fridays","Saturdays","Sundays"];
-    selectedDays.sort((a,b)=>d.indexOf(a)-d.indexOf(b));
-    document.getElementById('repeat-text').innerText = selectedDays.includes("Never") ? "Never" : selectedDays.map(d=>d.slice(0,3)).join(", ");
-}
+
 function renderAlarms() {
     const listContainer = document.getElementById('alarm-list-container');
     listContainer.innerHTML = alarms.map((alarm, index) => {
