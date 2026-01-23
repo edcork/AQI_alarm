@@ -10,6 +10,12 @@
 </head>
 <body>
 
+    <div id="refresh-spinner" class="refresh-spinner">
+        <svg viewBox="0 0 50 50" class="spinner-icon">
+            <circle cx="25" cy="25" r="20" fill="none" stroke="currentColor" stroke-width="4"></circle>
+        </svg>
+    </div>
+
     <div class="header">
         <button class="icon-btn" onclick="openSettings()">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -102,27 +108,9 @@
                 <div class="settings-section-title">Locations</div>
                 <div class="settings-list" id="settings-location-list"></div>
             </div>
-
-            <div class="settings-section">
-                <div class="settings-section-title">About</div>
-                <div class="settings-list">
-                    <div class="settings-row" onclick="alert('Contact Us clicked')">
-                        <span class="settings-label">Contact us</span>
-                        <span class="settings-arrow">›</span>
-                    </div>
-                    <div class="settings-row" onclick="alert('Privacy Policy clicked')">
-                        <span class="settings-label">Privacy policy</span>
-                        <span class="settings-arrow">›</span>
-                    </div>
-                    <div class="settings-row" onclick="alert('System Permissions clicked')">
-                        <span class="settings-label">System permissions</span>
-                        <span class="settings-arrow">›</span>
-                    </div>
-                </div>
-            </div>
             
             <div style="text-align: center; margin-top: 30px; color: var(--text-secondary); font-size: 13px;">
-                AQI Alarm v0.5.2<br>Powered by Open-Meteo
+                AQI Alarm v0.5.3<br>Powered by Open-Meteo
             </div>
         </div>
     </div>

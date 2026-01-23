@@ -5,7 +5,7 @@ let timeFormat = "24h";
 let currentAQIStandard = "US";
 let locations = [];
 let currentLocIndex = 0;
-let tempSelectedLocation = null; // Stores user selection before saving
+let tempSelectedLocation = null;
 
 // Open-Meteo Endpoints
 const API = {
@@ -15,34 +15,19 @@ const API = {
 
 // --- INITIALIZATION ---
 async function initData() {
-    // Add default location if empty (e.g. Shanghai)
     if (locations.length === 0) {
-        // We bypass the selection logic for the init
         await fetchAndAddLocation("Shanghai", true);
     }
 }
 
-// --- UTILITY: CALCULATE AQI ---
+// --- UTILITY ---
 function calculateAQI(pm25, standard = 'US') {
     const breakpoints = {
-        'US': [
-            [0.0, 12.0, 0, 50], [12.1, 35.4, 51, 100], [35.5, 55.4, 101, 150],
-            [55.5, 150.4, 151, 200], [150.5, 250.4, 201, 300], [250.5, 350.4, 301, 400], [350.5, 500.4, 401, 500]
-        ],
-        'CN': [
-            [0, 35, 0, 50], [35, 75, 51, 100], [75, 115, 101, 150],
-            [115, 150, 151, 200], [150, 250, 201, 300], [250, 350, 301, 400], [350, 500, 401, 500]
-        ],
-        'UK': [
-            [0, 11, 0, 50], [12, 23, 51, 100], [24, 35, 101, 150], [36, 41, 151, 200],
-            [42, 53, 201, 300], [54, 70, 301, 400], [71, 1000, 401, 500]
-        ],
-        'IN': [
-            [0, 30, 0, 50], [31, 60, 51, 100], [61, 90, 101, 200],
-            [91, 120, 201, 300], [121, 250, 301, 400], [250, 999, 401, 500]
-        ]
+        'US': [[0,12,0,50],[12.1,35.4,51,100],[35.5,55.4,101,150],[55.5,150.4,151,200],[150.5,250.4,201,300],[250.5,350.4,301,400],[350.5,500.4,401,500]],
+        'CN': [[0,35,0,50],[35,75,51,100],[75,115,101,150],[115,150,151,200],[150,250,201,300],[250,350,301,400],[350,500,401,500]],
+        'UK': [[0,11,0,50],[12,23,51,100],[24,35,101,150],[36,41,151,200],[42,53,201,300],[54,70,301,400],[71,1000,401,500]],
+        'IN': [[0,30,0,50],[31,60,51,100],[61,90,101,200],[91,120,201,300],[121,250,301,400],[250,999,401,500]]
     };
-
     const std = breakpoints[standard] || breakpoints['US'];
     for (let i = 0; i < std.length; i++) {
         const [cLow, cHigh, iLow, iHigh] = std[i];
@@ -71,59 +56,9 @@ function getColor(aqi) {
     return "#7e0023";
 }
 
-// --- DATA FETCHING (OPEN-METEO) ---
-
-// Search
-let searchTimeout;
-function handleSearch(e) {
-    const val = e.target.value;
-    const resultsDiv = document.getElementById('search-results');
-    // Clear selection
-    tempSelectedLocation = null; 
-    
-    clearTimeout(searchTimeout);
-    if (val.length < 3) { resultsDiv.innerHTML = ""; return; }
-
-    searchTimeout = setTimeout(async () => {
-        try {
-            const res = await fetch(`${API.GEO}?name=${val}&count=5&language=en&format=json`);
-            const data = await res.json();
-            if(data.results) {
-                resultsDiv.innerHTML = data.results.map((city, index) => `
-                    <div id="search-item-${index}" class="search-item" onclick="selectLocation(${index}, '${city.name.replace(/'/g, "\\'")}', ${city.latitude}, ${city.longitude})">
-                        <div class="search-item-city">${city.name}</div>
-                        <div class="search-item-country">${city.country}</div>
-                    </div>
-                `).join('');
-            }
-        } catch(e) { console.log(e); }
-    }, 500);
-}
-
-// User clicks a result in the list
-function selectLocation(index, name, lat, lon) {
-    // 1. Visually highlight
-    document.querySelectorAll('.search-item').forEach(el => el.classList.remove('selected'));
-    document.getElementById(`search-item-${index}`).classList.add('selected');
-    
-    // 2. Store data
-    tempSelectedLocation = { name, lat, lon };
-}
-
-// User clicks "Save" on Location Modal
-async function confirmAddLocation() {
-    if (!tempSelectedLocation) {
-        alert("Please select a location first.");
-        return;
-    }
-    await fetchAndAddLocation(tempSelectedLocation.name, false, tempSelectedLocation.lat, tempSelectedLocation.lon);
-    closeLocationSearch();
-}
-
-// Core Fetch Logic
+// --- DATA FETCHING ---
 async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
     try {
-        // If lat/lon provided (from click), use them. If not (from Init), fetch them.
         if (lat === null || lon === null) {
             const geoRes = await fetch(`${API.GEO}?name=${name}&count=1&language=en&format=json`);
             const geoData = await geoRes.json();
@@ -136,19 +71,25 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
         const airRes = await fetch(`${API.AIR}?latitude=${lat}&longitude=${lon}&current=pm2_5,pm10,nitrogen_dioxide,ozone&hourly=pm2_5`);
         const airData = await airRes.json();
 
-        const currentPM25 = airData.current.pm2_5;
-        const calculatedAQI = calculateAQI(currentPM25, currentAQIStandard);
-        
-        const hourlyPM25 = airData.hourly.pm2_5;
+        // 1. Raw Data Extraction
+        const rawCurrentPM25 = airData.current.pm2_5;
+        const rawForecastPM25 = airData.hourly.pm2_5;
+        const timeString = airData.current.time; // "2023-10-27T10:00"
+
+        // 2. Format Time
+        const dateObj = new Date(timeString);
+        // Note: Open-Meteo returns time in local requested timezone usually, or UTC. 
+        // We will just format it nicely.
+        const formattedTime = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: (timeFormat === '12h') });
+
+        // 3. Prepare Forecast Data Structure (Next 24h)
         const currentHourIndex = new Date().getHours(); 
-        
         const forecastData = [];
         for (let i = 0; i < 24; i++) {
             const idx = currentHourIndex + i;
-            if (idx < hourlyPM25.length) {
-                const val = hourlyPM25[idx];
+            if (idx < rawForecastPM25.length) {
                 forecastData.push({
-                    val: calculateAQI(val, currentAQIStandard),
+                    rawVal: rawForecastPM25[idx],
                     hour: (currentHourIndex + i) % 24
                 });
             }
@@ -156,13 +97,11 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
 
         const newLoc = {
             name: name,
-            aqi: calculatedAQI,
-            status: getStatus(calculatedAQI),
+            rawCurrentPM25: rawCurrentPM25,
+            rawForecast: forecastData,
             pollutant: "PM2.5",
-            time: "Now",
+            time: formattedTime,
             isCurrent: isCurrent,
-            color: getColor(calculatedAQI),
-            forecast: forecastData,
             lat: lat,
             lon: lon
         };
@@ -177,11 +116,33 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
 
     } catch (e) {
         console.error("API Error", e);
-        alert("Failed to fetch data.");
     }
 }
 
-// --- DASHBOARD RENDER ---
+// --- REFRESH ALL ---
+async function refreshAllLocations() {
+    // 1. Show spinner
+    const spinner = document.getElementById('refresh-spinner');
+    spinner.classList.add('visible');
+
+    // 2. Fetch all again. 
+    // Optimization: In a real app we would update the existing objects. 
+    // Here, simply clearing and re-fetching is safer/easier code.
+    const oldLocations = [...locations];
+    locations = []; // Clear current list to rebuild
+    
+    // We fetch them sequentially to maintain order
+    for (let loc of oldLocations) {
+        await fetchAndAddLocation(loc.name, loc.isCurrent, loc.lat, loc.lon);
+    }
+
+    // 3. Hide spinner
+    setTimeout(() => {
+        spinner.classList.remove('visible');
+    }, 500);
+}
+
+// --- RENDER DASHBOARD ---
 function renderDashboard() {
     const slider = document.getElementById('dashboard-slider');
     const dots = document.getElementById('dots-container');
@@ -192,13 +153,18 @@ function renderDashboard() {
     }
 
     slider.innerHTML = locations.map(loc => {
+        // DYNAMIC CALCULATION
+        const currentAQI = calculateAQI(loc.rawCurrentPM25, currentAQIStandard);
+        const status = getStatus(currentAQI);
+        const color = getColor(currentAQI);
         const iconHtml = loc.isCurrent 
             ? `<svg class="location-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"></path></svg>` 
             : '';
 
-        const barsHtml = loc.forecast.map((d, i) => {
-            let col = getColor(d.val);
-            const h = Math.min((d.val / 500) * 100, 100);
+        const barsHtml = loc.rawForecast.map((d, i) => {
+            const val = calculateAQI(d.rawVal, currentAQIStandard);
+            const col = getColor(val);
+            const h = Math.min((val / 500) * 100, 100);
 
             let timeLabel = "";
             if (i % 4 === 0) { 
@@ -232,8 +198,8 @@ function renderDashboard() {
         return `
         <div class="dashboard-slide">
             <div class="aqi-location-row">${iconHtml}<div class="aqi-location">${loc.name}</div></div>
-            <div class="aqi-value" style="color: ${loc.color}">${loc.aqi}</div>
-            <div class="aqi-status" style="color: ${loc.color}">${loc.status}</div>
+            <div class="aqi-value" style="color: ${color}">${currentAQI}</div>
+            <div class="aqi-status" style="color: ${color}">${status}</div>
             <div class="aqi-details">
                 <span>Major pollutant: ${loc.pollutant}</span><span>•</span><span>Last updated: ${loc.time}</span>
             </div>
@@ -246,37 +212,171 @@ function renderDashboard() {
 
     dots.innerHTML = locations.map((_, i) => `<div class="dot ${i === currentLocIndex ? 'active' : ''}"></div>`).join('');
     slider.style.transform = `translateX(-${currentLocIndex * 100}%)`;
-    
-    updateLocationDropdown();
-    renderSettingsLocations();
 }
 
+// --- UI UPDATES ---
 function updateAQIStandard(newStd) {
     currentAQIStandard = newStd;
+    renderDashboard();
 }
 
-function updateTimeFormat(val) { timeFormat = val; renderDashboard(); }
-
-const dashArea = document.getElementById('aqi-area');
-let dashStartX = 0;
-dashArea.addEventListener('touchstart', (e) => { dashStartX = e.touches[0].clientX; });
-dashArea.addEventListener('touchend', (e) => {
-    const diff = e.changedTouches[0].clientX - dashStartX;
-    if (diff > 50 && currentLocIndex > 0) currentLocIndex--;
-    else if (diff < -50 && currentLocIndex < locations.length - 1) currentLocIndex++;
+function updateTimeFormat(val) {
+    timeFormat = val;
     renderDashboard();
+}
+
+// --- TOUCH HANDLING (Pull to Refresh) ---
+let touchStartY = 0;
+let isRefreshing = false;
+const dashArea = document.getElementById('aqi-area');
+
+dashArea.addEventListener('touchstart', (e) => { 
+    if (dashArea.scrollTop === 0) {
+        touchStartY = e.touches[0].clientY; 
+    }
 });
 
-function updateLocationDropdown() {
-    const select = document.getElementById('new-location-select');
-    select.innerHTML = `<option value="Current Location">Current Location</option>` + 
-        locations.filter(l => !l.isCurrent).map(l => `<option value="${l.name}">${l.name}</option>`).join('');
+dashArea.addEventListener('touchmove', (e) => {
+    const y = e.touches[0].clientY;
+    if (touchStartY > 0 && y > touchStartY + 50 && !isRefreshing && dashArea.scrollTop === 0) {
+        // User pulled down enough
+        isRefreshing = true;
+        refreshAllLocations().then(() => {
+            isRefreshing = false;
+            touchStartY = 0;
+        });
+    }
+});
+
+dashArea.addEventListener('touchend', (e) => {
+    // Standard swipe for location (Left/Right)
+    if (!isRefreshing) {
+        const diff = e.changedTouches[0].clientX - (window.innerWidth / 2); // Approximate logic, usually startX
+        // For carousel, we use the logic from previous
+        // Re-implementing simplified swipe:
+    }
+});
+
+// Carousel Swipe Logic
+let carouselStartX = 0;
+dashArea.addEventListener('touchstart', (e) => { carouselStartX = e.touches[0].clientX; });
+dashArea.addEventListener('touchend', (e) => {
+    if (isRefreshing) return;
+    const diff = e.changedTouches[0].clientX - carouselStartX;
+    if (diff > 50 && currentLocIndex > 0) { currentLocIndex--; renderDashboard(); }
+    else if (diff < -50 && currentLocIndex < locations.length - 1) { currentLocIndex++; renderDashboard(); }
+});
+
+
+// ... (Standard Search/Alarm logic remains the same as previous step, just ensure `renderAlarms` is called) ...
+// Search
+let searchTimeout;
+function handleSearch(e) {
+    const val = e.target.value;
+    const resultsDiv = document.getElementById('search-results');
+    tempSelectedLocation = null; 
+    clearTimeout(searchTimeout);
+    if (val.length < 3) { resultsDiv.innerHTML = ""; return; }
+
+    searchTimeout = setTimeout(async () => {
+        try {
+            const res = await fetch(`${API.GEO}?name=${val}&count=5&language=en&format=json`);
+            const data = await res.json();
+            if(data.results) {
+                resultsDiv.innerHTML = data.results.map((city, index) => `
+                    <div id="search-item-${index}" class="search-item" onclick="selectLocation(${index}, '${city.name.replace(/'/g, "\\'")}', ${city.latitude}, ${city.longitude})">
+                        <div class="search-item-city">${city.name}</div>
+                        <div class="search-item-country">${city.country}</div>
+                    </div>
+                `).join('');
+            }
+        } catch(e) { console.log(e); }
+    }, 500);
 }
 
-function closeLocationSearch() { 
-    document.getElementById('location-modal').style.display = 'none'; 
+function selectLocation(index, name, lat, lon) {
+    document.querySelectorAll('.search-item').forEach(el => el.classList.remove('selected'));
+    document.getElementById(`search-item-${index}`).classList.add('selected');
+    tempSelectedLocation = { name, lat, lon };
 }
 
+async function confirmAddLocation() {
+    if (!tempSelectedLocation) { alert("Please select a location first."); return; }
+    await fetchAndAddLocation(tempSelectedLocation.name, false, tempSelectedLocation.lat, tempSelectedLocation.lon);
+    closeLocationSearch();
+}
+
+// Standard UI
+function closeLocationSearch() { document.getElementById('location-modal').style.display = 'none'; }
+function openSettings() { renderSettingsLocations(); document.getElementById('settings-modal').style.display = 'flex'; }
+function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
+function openAddMenu() { document.getElementById('menu-modal').style.display = 'block'; }
+function closeAddMenu() { document.getElementById('menu-modal').style.display = 'none'; }
+function selectMenuOption(opt) { closeAddMenu(); opt === 'alarm' ? openAddAlarm() : openLocationSearch(); }
+function openAddAlarm() {
+    selectedDays = ["Never"]; updateRepeatUI();
+    document.getElementById('new-label').value = ""; document.getElementById('new-aqi-op').value = "lt"; 
+    document.getElementById('repeat-wrapper').classList.remove('open');
+    document.getElementById('add-modal').style.display = 'flex';
+}
+function closeAddAlarm() { document.getElementById('add-modal').style.display = 'none'; }
+function openLocationSearch() {
+    document.getElementById('loc-search-input').value = ""; document.getElementById('search-results').innerHTML = "";
+    document.getElementById('location-modal').style.display = 'flex';
+}
+function removeLocation(index) {
+    const realIndex = index + 1; 
+    if (realIndex >= locations.length) return;
+    locations.splice(realIndex, 1);
+    if (currentLocIndex >= locations.length) currentLocIndex = locations.length - 1;
+    renderDashboard();
+}
+function renderSettingsLocations() {
+    const container = document.getElementById('settings-location-list');
+    const removableLocs = locations.slice(1);
+    if (removableLocs.length === 0) {
+        container.innerHTML = `<div class="settings-row" style="color: var(--text-secondary); font-size: 14px;">No added locations</div>`;
+    } else {
+        container.innerHTML = removableLocs.map((loc, i) => `
+            <div class="settings-row">
+                <span class="settings-label">${loc.name}</span>
+                <button class="settings-delete-btn" onclick="removeLocation(${i})">Remove</button>
+            </div>
+        `).join('');
+    }
+}
+function saveAlarm() {
+    alarms.push({ 
+        time: document.getElementById('new-time').value, 
+        label: document.getElementById('new-label').value, 
+        location: document.getElementById('new-location-select').value, 
+        conditions: [{ metric: 'aqi', operator: document.getElementById('new-aqi-op').value, value: document.getElementById('new-aqi').value }], 
+        repeat: [...selectedDays], 
+        sound: document.getElementById('new-sound').value,
+        active: true 
+    });
+    renderAlarms(); renderDashboard(); closeAddAlarm();
+}
+function toggleAlarm(index) { alarms[index].active = !alarms[index].active; renderDashboard(); }
+function toggleRepeatDropdown() { document.getElementById('repeat-wrapper').classList.toggle('open'); }
+function selectRepeat(val) {
+    if (val === "Never") selectedDays = ["Never"];
+    else {
+        if (selectedDays.includes("Never")) selectedDays = [];
+        const idx = selectedDays.indexOf(val);
+        if (idx > -1) selectedDays.splice(idx, 1); else selectedDays.push(val);
+        if (selectedDays.length === 0) selectedDays = ["Never"];
+    }
+    updateRepeatUI();
+}
+function updateRepeatUI() {
+    document.querySelectorAll('.custom-option').forEach(opt => {
+        opt.classList.toggle('selected', selectedDays.includes(opt.getAttribute('data-value')));
+    });
+    const d = ["Mondays","Tuesdays","Wednesdays","Thursdays","Fridays","Saturdays","Sundays"];
+    selectedDays.sort((a,b)=>d.indexOf(a)-d.indexOf(b));
+    document.getElementById('repeat-text').innerText = selectedDays.includes("Never") ? "Never" : selectedDays.map(d=>d.slice(0,3)).join(", ");
+}
 function renderAlarms() {
     const listContainer = document.getElementById('alarm-list-container');
     listContainer.innerHTML = alarms.map((alarm, index) => {
@@ -302,99 +402,8 @@ function renderAlarms() {
         </div>
     `}).join('');
 }
-
-let listStartX = 0, currentSwipeIndex = -1;
-function handleTouchStart(e, index) { listStartX = e.touches[0].clientX; currentSwipeIndex = index; }
-function handleTouchMove(e, index) {
-    if (currentSwipeIndex !== index) return;
-    const diff = e.touches[0].clientX - listStartX;
-    const row = document.getElementById(`row-${index}`);
-    if (diff < 0 && diff > -100) row.style.transform = `translateX(${diff}px)`;
-}
-function handleTouchEnd(e, index) {
-    const row = document.getElementById(`row-${index}`);
-    row.style.transform = (e.changedTouches[0].clientX - listStartX) < -80 ? `translateX(-100px)` : `translateX(0px)`;
-}
 function deleteAlarm(index) { alarms.splice(index, 1); renderAlarms(); renderDashboard(); }
 function formatDays(days) { return days.includes("Never") ? "Once" : (days.length === 7 ? "Daily" : days.map(d => d.slice(0, 3)).join(", ")); }
-
-function openSettings() { renderSettingsLocations(); document.getElementById('settings-modal').style.display = 'flex'; }
-function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
-function openAddMenu() { document.getElementById('menu-modal').style.display = 'block'; }
-function closeAddMenu() { document.getElementById('menu-modal').style.display = 'none'; }
-function selectMenuOption(opt) { closeAddMenu(); opt === 'alarm' ? openAddAlarm() : openLocationSearch(); }
-function openAddAlarm() {
-    selectedDays = ["Never"]; updateRepeatUI();
-    document.getElementById('new-label').value = ""; document.getElementById('new-aqi-op').value = "lt"; 
-    document.getElementById('repeat-wrapper').classList.remove('open');
-    document.getElementById('add-modal').style.display = 'flex';
-}
-function closeAddAlarm() { document.getElementById('add-modal').style.display = 'none'; }
-function openLocationSearch() {
-    document.getElementById('loc-search-input').value = ""; document.getElementById('search-results').innerHTML = "";
-    document.getElementById('location-modal').style.display = 'flex';
-}
-
-function removeLocation(index) {
-    const realIndex = index + 1; 
-    if (realIndex >= locations.length) return;
-    locations.splice(realIndex, 1);
-    if (currentLocIndex >= locations.length) currentLocIndex = locations.length - 1;
-    renderDashboard();
-}
-
-function renderSettingsLocations() {
-    const container = document.getElementById('settings-location-list');
-    const removableLocs = locations.slice(1);
-    if (removableLocs.length === 0) {
-        container.innerHTML = `<div class="settings-row" style="color: var(--text-secondary); font-size: 14px;">No added locations</div>`;
-    } else {
-        container.innerHTML = removableLocs.map((loc, i) => `
-            <div class="settings-row">
-                <span class="settings-label">${loc.name}</span>
-                <button class="settings-delete-btn" onclick="removeLocation(${i})">Remove</button>
-            </div>
-        `).join('');
-    }
-}
-
-function saveAlarm() {
-    alarms.push({ 
-        time: document.getElementById('new-time').value, 
-        label: document.getElementById('new-label').value, 
-        location: document.getElementById('new-location-select').value, 
-        conditions: [{ metric: 'aqi', operator: document.getElementById('new-aqi-op').value, value: document.getElementById('new-aqi').value }], 
-        repeat: [...selectedDays], 
-        sound: document.getElementById('new-sound').value,
-        active: true 
-    });
-    renderAlarms(); renderDashboard(); closeAddAlarm();
-}
-
-function toggleAlarm(index) {
-    alarms[index].active = !alarms[index].active;
-    renderDashboard();
-}
-
-function toggleRepeatDropdown() { document.getElementById('repeat-wrapper').classList.toggle('open'); }
-function selectRepeat(val) {
-    if (val === "Never") selectedDays = ["Never"];
-    else {
-        if (selectedDays.includes("Never")) selectedDays = [];
-        const idx = selectedDays.indexOf(val);
-        if (idx > -1) selectedDays.splice(idx, 1); else selectedDays.push(val);
-        if (selectedDays.length === 0) selectedDays = ["Never"];
-    }
-    updateRepeatUI();
-}
-function updateRepeatUI() {
-    document.querySelectorAll('.custom-option').forEach(opt => {
-        opt.classList.toggle('selected', selectedDays.includes(opt.getAttribute('data-value')));
-    });
-    const d = ["Mondays","Tuesdays","Wednesdays","Thursdays","Fridays","Saturdays","Sundays"];
-    selectedDays.sort((a,b)=>d.indexOf(a)-d.indexOf(b));
-    document.getElementById('repeat-text').innerText = selectedDays.includes("Never") ? "Never" : selectedDays.map(d=>d.slice(0,3)).join(", ");
-}
 
 initData();
 renderAlarms();
