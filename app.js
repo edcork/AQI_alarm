@@ -16,7 +16,6 @@ const API = {
 // --- INITIALIZATION ---
 async function initData() {
     if (locations.length === 0) {
-        // Initial load
         await fetchAndAddLocation("Shanghai", true);
     }
 }
@@ -88,31 +87,20 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
             name = geoData.results[0].name;
         }
 
-        // Detect User Timezone (e.g. "Asia/Singapore")
         const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-        // Fetch Data:
-        // 1. timezone=... ensures the Hourly Array aligns with the user's clock (00:00 index = 00:00 User Time)
-        // 2. timeformat=unixtime ensures we get a raw timestamp number for easy conversion
         const airRes = await fetch(`${API.AIR}?latitude=${lat}&longitude=${lon}&current=pm2_5,pm10,nitrogen_dioxide,ozone&hourly=pm2_5&timezone=${userTimezone}&timeformat=unixtime`);
         const airData = await airRes.json();
 
-        // 1. Raw Data Extraction
+        // Data Extraction
         const rawCurrentPM25 = airData.current.pm2_5;
         const rawForecastPM25 = airData.hourly.pm2_5;
-        
-        // 2. Format Time (Last Updated)
-        // airData.current.time is now a Unix Timestamp (seconds). 
-        // We multiply by 1000 to get milliseconds for the JS Date object.
         const dateObj = new Date(airData.current.time * 1000);
         const formattedTime = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: (timeFormat === '12h') });
 
-        // 3. Prepare Forecast Data Structure (Next 24h)
+        // Forecast Data
         const currentHourIndex = new Date().getHours(); 
         const forecastData = [];
         for (let i = 0; i < 24; i++) {
-            // Because we requested the user's timezone, index 0 of the array is 00:00 User Time.
-            // So we can simply offset by the user's current hour.
             const idx = currentHourIndex + i;
             if (idx < rawForecastPM25.length) {
                 forecastData.push({
@@ -139,14 +127,13 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
         if (!isCurrent) currentLocIndex = locations.length - 1;
         
         renderDashboard();
-        renderSettingsLocations();
+        // Removed renderSettingsLocations() here to avoid redrawing if dashboard isn't ready
 
     } catch (e) {
         console.error("API Error", e);
     }
 }
 
-// --- REFRESH ALL ---
 async function refreshAllLocations() {
     const spinner = document.getElementById('refresh-spinner');
     spinner.classList.add('visible');
@@ -174,7 +161,6 @@ function renderDashboard() {
     }
 
     slider.innerHTML = locations.map(loc => {
-        // DYNAMIC CALCULATION based on CURRENT STANDARD
         const currentAQI = calculateAQI(loc.rawCurrentPM25, currentAQIStandard);
         const status = getStatus(currentAQI, currentAQIStandard);
         const color = getColor(currentAQI, currentAQIStandard);
@@ -188,8 +174,6 @@ function renderDashboard() {
         const barsHtml = loc.rawForecast.map((d, i) => {
             const val = calculateAQI(d.rawVal, currentAQIStandard);
             const col = getColor(val, currentAQIStandard);
-            
-            // Dynamic Height Percentage
             const h = Math.min((val / maxVal) * 100, 100);
 
             let timeLabel = "";
@@ -239,11 +223,29 @@ function renderDashboard() {
     dots.innerHTML = locations.map((_, i) => `<div class="dot ${i === currentLocIndex ? 'active' : ''}"></div>`).join('');
     slider.style.transform = `translateX(-${currentLocIndex * 100}%)`;
     
+    // Ensure lists are up to date
     updateLocationDropdown();
     renderSettingsLocations();
 }
 
-// --- UI UPDATES ---
+// --- UI HELPERS ---
+function updateLocationDropdown() {
+    const select = document.getElementById('new-location-select');
+    if (!select) return;
+    
+    // Clear and populate with ALL locations
+    if (locations.length === 0) {
+        select.innerHTML = '<option disabled>Loading locations...</option>';
+        return;
+    }
+
+    select.innerHTML = locations.map(loc => {
+        const label = loc.isCurrent ? `${loc.name} (Current)` : loc.name;
+        // Using name as value since it's unique enough for this app
+        return `<option value="${loc.name}">${label}</option>`;
+    }).join('');
+}
+
 function updateAQIStandard(newStd) {
     currentAQIStandard = newStd;
     renderDashboard(); 
@@ -251,12 +253,10 @@ function updateAQIStandard(newStd) {
 
 function updateTimeFormat(val) {
     timeFormat = val;
-    // We also need to refresh the "Last Updated" text which is stored in the object.
-    // Ideally we re-fetch, or re-parse from raw. For simplicity, re-fetch.
     refreshAllLocations();
 }
 
-// --- TOUCH HANDLING (Pull to Refresh) ---
+// --- TOUCH HANDLING ---
 let touchStartY = 0;
 let isRefreshing = false;
 const dashArea = document.getElementById('aqi-area');
@@ -265,6 +265,8 @@ dashArea.addEventListener('touchstart', (e) => {
     if (dashArea.scrollTop === 0) {
         touchStartY = e.touches[0].clientY; 
     }
+    // Also track X for carousel
+    carouselStartX = e.touches[0].clientX;
 });
 
 dashArea.addEventListener('touchmove', (e) => {
@@ -278,15 +280,7 @@ dashArea.addEventListener('touchmove', (e) => {
     }
 });
 
-dashArea.addEventListener('touchend', (e) => {
-    if (!isRefreshing) {
-        // Carousel swipe logic handled below
-    }
-});
-
-// Carousel Swipe Logic
 let carouselStartX = 0;
-dashArea.addEventListener('touchstart', (e) => { carouselStartX = e.touches[0].clientX; });
 dashArea.addEventListener('touchend', (e) => {
     if (isRefreshing) return;
     const diff = e.changedTouches[0].clientX - carouselStartX;
@@ -294,8 +288,7 @@ dashArea.addEventListener('touchend', (e) => {
     else if (diff < -50 && currentLocIndex < locations.length - 1) { currentLocIndex++; renderDashboard(); }
 });
 
-
-// --- SEARCH & UI LOGIC ---
+// --- SEARCH & MENU ---
 let searchTimeout;
 function handleSearch(e) {
     const val = e.target.value;
@@ -338,17 +331,25 @@ function closeSettings() { document.getElementById('settings-modal').style.displ
 function openAddMenu() { document.getElementById('menu-modal').style.display = 'block'; }
 function closeAddMenu() { document.getElementById('menu-modal').style.display = 'none'; }
 function selectMenuOption(opt) { closeAddMenu(); opt === 'alarm' ? openAddAlarm() : openLocationSearch(); }
+
 function openAddAlarm() {
-    selectedDays = ["Never"]; updateRepeatUI();
-    document.getElementById('new-label').value = ""; document.getElementById('new-aqi-op').value = "lt"; 
+    selectedDays = ["Never"]; 
+    updateRepeatUI();
+    // Ensure dropdown is populated before showing
+    updateLocationDropdown();
+    
+    document.getElementById('new-label').value = ""; 
+    document.getElementById('new-aqi-op').value = "lt"; 
     document.getElementById('repeat-wrapper').classList.remove('open');
     document.getElementById('add-modal').style.display = 'flex';
 }
+
 function closeAddAlarm() { document.getElementById('add-modal').style.display = 'none'; }
 function openLocationSearch() {
     document.getElementById('loc-search-input').value = ""; document.getElementById('search-results').innerHTML = "";
     document.getElementById('location-modal').style.display = 'flex';
 }
+
 function removeLocation(index) {
     const realIndex = index + 1; 
     if (realIndex >= locations.length) return;
@@ -356,6 +357,7 @@ function removeLocation(index) {
     if (currentLocIndex >= locations.length) currentLocIndex = locations.length - 1;
     renderDashboard();
 }
+
 function renderSettingsLocations() {
     const container = document.getElementById('settings-location-list');
     const removableLocs = locations.slice(1);
@@ -370,18 +372,37 @@ function renderSettingsLocations() {
         `).join('');
     }
 }
+
 function saveAlarm() {
+    // 1. Validation
+    const timeVal = document.getElementById('new-time').value;
+    const aqiVal = document.getElementById('new-aqi').value;
+    const locVal = document.getElementById('new-location-select').value;
+
+    if (!timeVal || !aqiVal) {
+        alert("Please set a time and AQI threshold.");
+        return;
+    }
+
+    // 2. Add Alarm Data
     alarms.push({ 
-        time: document.getElementById('new-time').value, 
+        time: timeVal, 
         label: document.getElementById('new-label').value, 
-        location: document.getElementById('new-location-select').value, 
-        conditions: [{ metric: 'aqi', operator: document.getElementById('new-aqi-op').value, value: document.getElementById('new-aqi').value }], 
+        location: locVal, 
+        conditions: [{ metric: 'aqi', operator: document.getElementById('new-aqi-op').value, value: aqiVal }], 
         repeat: [...selectedDays], 
         sound: document.getElementById('new-sound').value,
         active: true 
     });
-    renderAlarms(); renderDashboard(); closeAddAlarm();
+
+    // 3. Close UI IMMEDIATELY
+    closeAddAlarm();
+
+    // 4. Render updates in background
+    renderAlarms(); 
+    renderDashboard(); 
 }
+
 function toggleAlarm(index) { alarms[index].active = !alarms[index].active; renderDashboard(); }
 function toggleRepeatDropdown() { document.getElementById('repeat-wrapper').classList.toggle('open'); }
 function selectRepeat(val) {
