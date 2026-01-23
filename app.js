@@ -3,7 +3,7 @@ let alarms = [];
 let selectedDays = []; 
 let timeFormat = "24h";
 let currentAQIStandard = "US";
-let currentTheme = "dark"; // New config
+let currentTheme = "dark"; 
 let locations = [];
 let currentLocIndex = 0;
 let tempSelectedLocation = null;
@@ -244,10 +244,15 @@ function handleLocationSelectChange(select) {
     }
 }
 
-// --- NEW THEME LOGIC ---
-function updateTheme(val) {
-    currentTheme = val;
-    document.documentElement.setAttribute('data-theme', val);
+// --- UPDATED THEME LOGIC ---
+function updateTheme(isDark) {
+    if (isDark) {
+        currentTheme = "dark";
+        document.documentElement.removeAttribute('data-theme');
+    } else {
+        currentTheme = "light";
+        document.documentElement.setAttribute('data-theme', 'light');
+    }
 }
 
 function updateAQIStandard(newStd) {
@@ -323,13 +328,9 @@ async function confirmAddLocation() {
     if (isAlarmLocationSearch) {
         const name = tempSelectedLocation.name;
         adHocLocations.add(name);
-        
         updateLocationDropdown();
-        
         const select = document.getElementById('new-location-select');
         select.value = name;
-        
-        // FIXED: Turn off flag first so closeLocationSearch doesn't revert
         isAlarmLocationSearch = false;
         closeLocationSearch();
     } else {
