@@ -20,25 +20,65 @@ async function initData() {
     }
 }
 
-// --- UTILITY ---
-function calculateAQI(pm25, standard = 'US') {
-    const breakpoints = {
-        'US': [[0,12,0,50],[12.1,35.4,51,100],[35.5,55.4,101,150],[55.5,150.4,151,200],[150.5,250.4,201,300],[250.5,350.4,301,400],[350.5,500.4,401,500]],
-        'CN': [[0,35,0,50],[35,75,51,100],[75,115,101,150],[115,150,151,200],[150,250,201,300],[250,350,301,400],[350,500,401,500]],
-        'UK': [[0,11,0,50],[12,23,51,100],[24,35,101,150],[36,41,151,200],[42,53,201,300],[54,70,301,400],[71,1000,401,500]],
-        'IN': [[0,30,0,50],[31,60,51,100],[61,90,101,200],[91,120,201,300],[121,250,301,400],[250,999,401,500]]
-    };
-    const std = breakpoints[standard] || breakpoints['US'];
-    for (let i = 0; i < std.length; i++) {
-        const [cLow, cHigh, iLow, iHigh] = std[i];
-        if (pm25 >= cLow && pm25 <= cHigh) {
-            return Math.round(((iHigh - iLow) / (cHigh - cLow)) * (pm25 - cLow) + iLow);
-        }
-    }
+// --- UTILITY: STANDARDS & CALCULATION ---
+
+// Returns the maximum possible value for a standard (for chart scaling)
+function getStandardMax(standard) {
+    if (standard === 'UK') return 10;
     return 500;
 }
 
-function getStatus(aqi) {
+function calculateAQI(pm25, standard = 'US') {
+    // Breakpoints: [ConcentrationLow, ConcentrationHigh, IndexLow, IndexHigh]
+    const breakpoints = {
+        'US': [ // EPA (0-500)
+            [0.0, 12.0, 0, 50], [12.1, 35.4, 51, 100], [35.5, 55.4, 101, 150],
+            [55.5, 150.4, 151, 200], [150.5, 250.4, 201, 300], [250.5, 350.4, 301, 400], [350.5, 500.4, 401, 500]
+        ],
+        'CN': [ // China MEP (0-500)
+            [0, 35, 0, 50], [35, 75, 51, 100], [75, 115, 101, 150],
+            [115, 150, 151, 200], [150, 250, 201, 300], [250, 350, 301, 400], [350, 500, 401, 500]
+        ],
+        'UK': [ // UK DAQI (1-10) - DEFRA Bands
+            [0, 11, 1, 1],   // Band 1
+            [12, 23, 2, 2],  // Band 2
+            [24, 35, 3, 3],  // Band 3
+            [36, 41, 4, 4],  // Band 4
+            [42, 47, 5, 5],  // Band 5
+            [48, 53, 6, 6],  // Band 6
+            [54, 58, 7, 7],  // Band 7
+            [59, 64, 8, 8],  // Band 8
+            [65, 70, 9, 9],  // Band 9
+            [71, 1000, 10, 10] // Band 10
+        ],
+        'IN': [ // India NAQI (0-500)
+            [0, 30, 0, 50], [31, 60, 51, 100], [61, 90, 101, 200],
+            [91, 120, 201, 300], [121, 250, 301, 400], [250, 999, 401, 500]
+        ]
+    };
+
+    const std = breakpoints[standard] || breakpoints['US'];
+    
+    for (let i = 0; i < std.length; i++) {
+        const [cLow, cHigh, iLow, iHigh] = std[i];
+        if (pm25 >= cLow && pm25 <= cHigh) {
+            // Linear interpolation
+            // For UK, iHigh and iLow are identical, so this just returns the band number
+            return Math.round(((iHigh - iLow) / (cHigh - cLow)) * (pm25 - cLow) + iLow);
+        }
+    }
+    // Cap at max if exceeded
+    return standard === 'UK' ? 10 : 500;
+}
+
+function getStatus(aqi, standard = 'US') {
+    if (standard === 'UK') {
+        if (aqi <= 3) return "Low";
+        if (aqi <= 6) return "Moderate";
+        if (aqi <= 9) return "High";
+        return "Very High";
+    }
+    // Standard 0-500 Scale (US/CN/IN)
     if (aqi <= 50) return "Good";
     if (aqi <= 100) return "Moderate";
     if (aqi <= 150) return "Unhealthy (Sens.)";
@@ -47,7 +87,14 @@ function getStatus(aqi) {
     return "Hazardous";
 }
 
-function getColor(aqi) {
+function getColor(aqi, standard = 'US') {
+    if (standard === 'UK') {
+        if (aqi <= 3) return "var(--success-color)"; // Low (Green)
+        if (aqi <= 6) return "var(--aqi-unhealthy)"; // Moderate (Orange) - UK uses Orange for Mod
+        if (aqi <= 9) return "var(--danger-color)";  // High (Red)
+        return "#8f3f97"; // Very High (Purple)
+    }
+    // Standard 0-500 Scale
     if (aqi <= 50) return "var(--success-color)";
     if (aqi <= 100) return "var(--aqi-moderate)";
     if (aqi <= 150) return "var(--aqi-unhealthy)";
@@ -56,7 +103,8 @@ function getColor(aqi) {
     return "#7e0023";
 }
 
-// --- DATA FETCHING ---
+// --- DATA FETCHING (OPEN-METEO) ---
+
 async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
     try {
         if (lat === null || lon === null) {
@@ -74,12 +122,10 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
         // 1. Raw Data Extraction
         const rawCurrentPM25 = airData.current.pm2_5;
         const rawForecastPM25 = airData.hourly.pm2_5;
-        const timeString = airData.current.time; // "2023-10-27T10:00"
+        const timeString = airData.current.time; 
 
-        // 2. Format Time
+        // 2. Format Time (Last Updated)
         const dateObj = new Date(timeString);
-        // Note: Open-Meteo returns time in local requested timezone usually, or UTC. 
-        // We will just format it nicely.
         const formattedTime = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: (timeFormat === '12h') });
 
         // 3. Prepare Forecast Data Structure (Next 24h)
@@ -88,6 +134,8 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
         for (let i = 0; i < 24; i++) {
             const idx = currentHourIndex + i;
             if (idx < rawForecastPM25.length) {
+                // Store RAW PM2.5 value, not calculated AQI
+                // This allows dynamic switching of standards later
                 forecastData.push({
                     rawVal: rawForecastPM25[idx],
                     hour: (currentHourIndex + i) % 24
@@ -121,22 +169,16 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
 
 // --- REFRESH ALL ---
 async function refreshAllLocations() {
-    // 1. Show spinner
     const spinner = document.getElementById('refresh-spinner');
     spinner.classList.add('visible');
 
-    // 2. Fetch all again. 
-    // Optimization: In a real app we would update the existing objects. 
-    // Here, simply clearing and re-fetching is safer/easier code.
     const oldLocations = [...locations];
-    locations = []; // Clear current list to rebuild
+    locations = []; 
     
-    // We fetch them sequentially to maintain order
     for (let loc of oldLocations) {
         await fetchAndAddLocation(loc.name, loc.isCurrent, loc.lat, loc.lon);
     }
 
-    // 3. Hide spinner
     setTimeout(() => {
         spinner.classList.remove('visible');
     }, 500);
@@ -153,18 +195,23 @@ function renderDashboard() {
     }
 
     slider.innerHTML = locations.map(loc => {
-        // DYNAMIC CALCULATION
+        // DYNAMIC CALCULATION based on CURRENT STANDARD
         const currentAQI = calculateAQI(loc.rawCurrentPM25, currentAQIStandard);
-        const status = getStatus(currentAQI);
-        const color = getColor(currentAQI);
+        const status = getStatus(currentAQI, currentAQIStandard);
+        const color = getColor(currentAQI, currentAQIStandard);
+        
         const iconHtml = loc.isCurrent 
             ? `<svg class="location-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"></path></svg>` 
             : '';
 
+        const maxVal = getStandardMax(currentAQIStandard);
+
         const barsHtml = loc.rawForecast.map((d, i) => {
             const val = calculateAQI(d.rawVal, currentAQIStandard);
-            const col = getColor(val);
-            const h = Math.min((val / 500) * 100, 100);
+            const col = getColor(val, currentAQIStandard);
+            
+            // Dynamic Height Percentage
+            const h = Math.min((val / maxVal) * 100, 100);
 
             let timeLabel = "";
             if (i % 4 === 0) { 
@@ -212,17 +259,20 @@ function renderDashboard() {
 
     dots.innerHTML = locations.map((_, i) => `<div class="dot ${i === currentLocIndex ? 'active' : ''}"></div>`).join('');
     slider.style.transform = `translateX(-${currentLocIndex * 100}%)`;
+    
+    updateLocationDropdown();
+    renderSettingsLocations();
 }
 
 // --- UI UPDATES ---
 function updateAQIStandard(newStd) {
     currentAQIStandard = newStd;
-    renderDashboard();
+    renderDashboard(); // Force re-render with new calculation
 }
 
 function updateTimeFormat(val) {
     timeFormat = val;
-    renderDashboard();
+    renderDashboard(); // Force re-render with new time format
 }
 
 // --- TOUCH HANDLING (Pull to Refresh) ---
@@ -239,7 +289,6 @@ dashArea.addEventListener('touchstart', (e) => {
 dashArea.addEventListener('touchmove', (e) => {
     const y = e.touches[0].clientY;
     if (touchStartY > 0 && y > touchStartY + 50 && !isRefreshing && dashArea.scrollTop === 0) {
-        // User pulled down enough
         isRefreshing = true;
         refreshAllLocations().then(() => {
             isRefreshing = false;
@@ -249,15 +298,14 @@ dashArea.addEventListener('touchmove', (e) => {
 });
 
 dashArea.addEventListener('touchend', (e) => {
-    // Standard swipe for location (Left/Right)
     if (!isRefreshing) {
-        const diff = e.changedTouches[0].clientX - (window.innerWidth / 2); // Approximate logic, usually startX
-        // For carousel, we use the logic from previous
-        // Re-implementing simplified swipe:
+        // Simple swipe detection for carousel
+        // We use a simplified version here without complex touch-tracking variables for brevity
+        // Ideally reuse the full logic if needed
     }
 });
 
-// Carousel Swipe Logic
+// Carousel Swipe Logic (Re-implemented clean)
 let carouselStartX = 0;
 dashArea.addEventListener('touchstart', (e) => { carouselStartX = e.touches[0].clientX; });
 dashArea.addEventListener('touchend', (e) => {
@@ -268,8 +316,7 @@ dashArea.addEventListener('touchend', (e) => {
 });
 
 
-// ... (Standard Search/Alarm logic remains the same as previous step, just ensure `renderAlarms` is called) ...
-// Search
+// --- SEARCH & UI LOGIC ---
 let searchTimeout;
 function handleSearch(e) {
     const val = e.target.value;
@@ -306,7 +353,6 @@ async function confirmAddLocation() {
     closeLocationSearch();
 }
 
-// Standard UI
 function closeLocationSearch() { document.getElementById('location-modal').style.display = 'none'; }
 function openSettings() { renderSettingsLocations(); document.getElementById('settings-modal').style.display = 'flex'; }
 function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
