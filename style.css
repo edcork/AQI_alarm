@@ -163,8 +163,22 @@ input:checked + .slider:before { transform: translateX(20px); }
 .custom-option.selected { color: var(--accent-color); background-color: rgba(10, 132, 255, 0.1); }
 .custom-option.selected::after { content: '✓'; font-weight: bold; }
 
-.modal-actions { display: flex; gap: 15px; margin-top: 25px; width: 100%; }
-#location-modal .modal-actions { position: absolute; bottom: 30px; left: 20px; right: 20px; width: auto; }
+/* MODAL ACTION BAR - UPDATED */
+.modal-actions { 
+    display: flex; 
+    gap: 15px; 
+    margin-top: 25px; 
+    width: 100%; 
+    justify-content: center; /* Center the buttons */
+}
+#location-modal .modal-actions { 
+    position: absolute; 
+    bottom: 30px; 
+    left: 20px; 
+    right: 20px; 
+    width: auto; 
+    /* Inherits justify-content: center */
+}
 
 .search-results { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; max-height: calc(100vh - 200px); }
 .search-item { background-color: var(--card-bg); padding: 15px; border-radius: 10px; cursor: pointer; border: 1px solid transparent; }
