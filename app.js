@@ -16,58 +16,32 @@ const API = {
 // --- INITIALIZATION ---
 async function initData() {
     if (locations.length === 0) {
+        // Initial load
         await fetchAndAddLocation("Shanghai", true);
     }
 }
 
 // --- UTILITY: STANDARDS & CALCULATION ---
-
-// Returns the maximum possible value for a standard (for chart scaling)
 function getStandardMax(standard) {
     if (standard === 'UK') return 10;
     return 500;
 }
 
 function calculateAQI(pm25, standard = 'US') {
-    // Breakpoints: [ConcentrationLow, ConcentrationHigh, IndexLow, IndexHigh]
     const breakpoints = {
-        'US': [ // EPA (0-500)
-            [0.0, 12.0, 0, 50], [12.1, 35.4, 51, 100], [35.5, 55.4, 101, 150],
-            [55.5, 150.4, 151, 200], [150.5, 250.4, 201, 300], [250.5, 350.4, 301, 400], [350.5, 500.4, 401, 500]
-        ],
-        'CN': [ // China MEP (0-500)
-            [0, 35, 0, 50], [35, 75, 51, 100], [75, 115, 101, 150],
-            [115, 150, 151, 200], [150, 250, 201, 300], [250, 350, 301, 400], [350, 500, 401, 500]
-        ],
-        'UK': [ // UK DAQI (1-10) - DEFRA Bands
-            [0, 11, 1, 1],   // Band 1
-            [12, 23, 2, 2],  // Band 2
-            [24, 35, 3, 3],  // Band 3
-            [36, 41, 4, 4],  // Band 4
-            [42, 47, 5, 5],  // Band 5
-            [48, 53, 6, 6],  // Band 6
-            [54, 58, 7, 7],  // Band 7
-            [59, 64, 8, 8],  // Band 8
-            [65, 70, 9, 9],  // Band 9
-            [71, 1000, 10, 10] // Band 10
-        ],
-        'IN': [ // India NAQI (0-500)
-            [0, 30, 0, 50], [31, 60, 51, 100], [61, 90, 101, 200],
-            [91, 120, 201, 300], [121, 250, 301, 400], [250, 999, 401, 500]
-        ]
+        'US': [[0,12,0,50],[12.1,35.4,51,100],[35.5,55.4,101,150],[55.5,150.4,151,200],[150.5,250.4,201,300],[250.5,350.4,301,400],[350.5,500.4,401,500]],
+        'CN': [[0,35,0,50],[35,75,51,100],[75,115,101,150],[115,150,151,200],[150,250,201,300],[250,350,301,400],[350,500,401,500]],
+        'UK': [[0,11,1,1],[12,23,2,2],[24,35,3,3],[36,41,4,4],[42,47,5,5],[48,53,6,6],[54,58,7,7],[59,64,8,8],[65,70,9,9],[71,1000,10,10]],
+        'IN': [[0,30,0,50],[31,60,51,100],[61,90,101,200],[91,120,201,300],[121,250,301,400],[250,999,401,500]]
     };
 
     const std = breakpoints[standard] || breakpoints['US'];
-    
     for (let i = 0; i < std.length; i++) {
         const [cLow, cHigh, iLow, iHigh] = std[i];
         if (pm25 >= cLow && pm25 <= cHigh) {
-            // Linear interpolation
-            // For UK, iHigh and iLow are identical, so this just returns the band number
             return Math.round(((iHigh - iLow) / (cHigh - cLow)) * (pm25 - cLow) + iLow);
         }
     }
-    // Cap at max if exceeded
     return standard === 'UK' ? 10 : 500;
 }
 
@@ -78,7 +52,6 @@ function getStatus(aqi, standard = 'US') {
         if (aqi <= 9) return "High";
         return "Very High";
     }
-    // Standard 0-500 Scale (US/CN/IN)
     if (aqi <= 50) return "Good";
     if (aqi <= 100) return "Moderate";
     if (aqi <= 150) return "Unhealthy (Sens.)";
@@ -89,12 +62,11 @@ function getStatus(aqi, standard = 'US') {
 
 function getColor(aqi, standard = 'US') {
     if (standard === 'UK') {
-        if (aqi <= 3) return "var(--success-color)"; // Low (Green)
-        if (aqi <= 6) return "var(--aqi-unhealthy)"; // Moderate (Orange) - UK uses Orange for Mod
-        if (aqi <= 9) return "var(--danger-color)";  // High (Red)
-        return "#8f3f97"; // Very High (Purple)
+        if (aqi <= 3) return "var(--success-color)";
+        if (aqi <= 6) return "var(--aqi-unhealthy)";
+        if (aqi <= 9) return "var(--danger-color)";
+        return "#8f3f97";
     }
-    // Standard 0-500 Scale
     if (aqi <= 50) return "var(--success-color)";
     if (aqi <= 100) return "var(--aqi-moderate)";
     if (aqi <= 150) return "var(--aqi-unhealthy)";
@@ -116,26 +88,33 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
             name = geoData.results[0].name;
         }
 
-        const airRes = await fetch(`${API.AIR}?latitude=${lat}&longitude=${lon}&current=pm2_5,pm10,nitrogen_dioxide,ozone&hourly=pm2_5`);
+        // Detect User Timezone (e.g. "Asia/Singapore")
+        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+        // Fetch Data:
+        // 1. timezone=... ensures the Hourly Array aligns with the user's clock (00:00 index = 00:00 User Time)
+        // 2. timeformat=unixtime ensures we get a raw timestamp number for easy conversion
+        const airRes = await fetch(`${API.AIR}?latitude=${lat}&longitude=${lon}&current=pm2_5,pm10,nitrogen_dioxide,ozone&hourly=pm2_5&timezone=${userTimezone}&timeformat=unixtime`);
         const airData = await airRes.json();
 
         // 1. Raw Data Extraction
         const rawCurrentPM25 = airData.current.pm2_5;
         const rawForecastPM25 = airData.hourly.pm2_5;
-        const timeString = airData.current.time; 
-
+        
         // 2. Format Time (Last Updated)
-        const dateObj = new Date(timeString);
+        // airData.current.time is now a Unix Timestamp (seconds). 
+        // We multiply by 1000 to get milliseconds for the JS Date object.
+        const dateObj = new Date(airData.current.time * 1000);
         const formattedTime = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: (timeFormat === '12h') });
 
         // 3. Prepare Forecast Data Structure (Next 24h)
         const currentHourIndex = new Date().getHours(); 
         const forecastData = [];
         for (let i = 0; i < 24; i++) {
+            // Because we requested the user's timezone, index 0 of the array is 00:00 User Time.
+            // So we can simply offset by the user's current hour.
             const idx = currentHourIndex + i;
             if (idx < rawForecastPM25.length) {
-                // Store RAW PM2.5 value, not calculated AQI
-                // This allows dynamic switching of standards later
                 forecastData.push({
                     rawVal: rawForecastPM25[idx],
                     hour: (currentHourIndex + i) % 24
@@ -267,12 +246,14 @@ function renderDashboard() {
 // --- UI UPDATES ---
 function updateAQIStandard(newStd) {
     currentAQIStandard = newStd;
-    renderDashboard(); // Force re-render with new calculation
+    renderDashboard(); 
 }
 
 function updateTimeFormat(val) {
     timeFormat = val;
-    renderDashboard(); // Force re-render with new time format
+    // We also need to refresh the "Last Updated" text which is stored in the object.
+    // Ideally we re-fetch, or re-parse from raw. For simplicity, re-fetch.
+    refreshAllLocations();
 }
 
 // --- TOUCH HANDLING (Pull to Refresh) ---
@@ -299,13 +280,11 @@ dashArea.addEventListener('touchmove', (e) => {
 
 dashArea.addEventListener('touchend', (e) => {
     if (!isRefreshing) {
-        // Simple swipe detection for carousel
-        // We use a simplified version here without complex touch-tracking variables for brevity
-        // Ideally reuse the full logic if needed
+        // Carousel swipe logic handled below
     }
 });
 
-// Carousel Swipe Logic (Re-implemented clean)
+// Carousel Swipe Logic
 let carouselStartX = 0;
 dashArea.addEventListener('touchstart', (e) => { carouselStartX = e.touches[0].clientX; });
 dashArea.addEventListener('touchend', (e) => {
