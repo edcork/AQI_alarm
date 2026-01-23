@@ -69,7 +69,13 @@ body {
     box-sizing: border-box;
 }
 
-.aqi-location-row { display: flex; align-items: center; gap: 6px; margin-bottom: 0px; }
+/* FIXED: Changed to baseline alignment */
+.aqi-location-row { 
+    display: flex; 
+    align-items: baseline; 
+    gap: 6px; 
+    margin-bottom: 0px; 
+}
 .aqi-location { font-size: 18px; font-weight: 500; }
 
 .location-icon { 
@@ -77,6 +83,9 @@ body {
     height: 16px; 
     fill: var(--text-secondary);
     transform: rotate(45deg); 
+    /* Adjust slightly if baseline feels too low visually */
+    position: relative;
+    top: 2px;
 }
 
 .aqi-value { font-size: 70px; font-weight: 700; line-height: 1; margin: 5px 0; }
@@ -121,8 +130,9 @@ body {
     margin-bottom: 2px;
 }
 
+/* FIXED: Reduced width to match bar for perfect centering */
 .alarm-marker-icon {
-    width: 100%; 
+    width: 60%; 
     height: auto;
     max-height: 14px; 
     fill: var(--text-primary);
@@ -180,18 +190,16 @@ body {
 
 .section-title { font-size: 28px; font-weight: 700; margin-bottom: 20px; padding-left: 5px; }
 
-.empty-state {
-    display: flex; flex-direction: column; align-items: center;
-    justify-content: center; height: 100%; color: var(--text-secondary);
-}
-
+/* FIXED: Persistent Add Button styling */
 .btn-add-alarm-large {
     background-color: var(--card-bg); color: var(--accent-color);
     border: 1px solid #333; padding: 15px 30px; border-radius: 25px;
-    font-size: 16px; margin-top: 15px; cursor: pointer;
+    font-size: 16px; margin-top: 20px; cursor: pointer;
+    align-self: center; /* Center the button */
+    margin-bottom: 30px;
 }
 
-.alarm-container { position: relative; margin-bottom: 12px; height: 90px; border-radius: 16px; overflow: hidden; }
+.alarm-container { position: relative; margin-bottom: 12px; height: 90px; border-radius: 16px; overflow: hidden; flex-shrink: 0; }
 .alarm-delete-bg {
     position: absolute; top: 0; bottom: 0; right: 0; width: 100%;
     background-color: var(--danger-color); display: flex; justify-content: flex-end; align-items: center;

@@ -32,11 +32,8 @@
 
     <section id="alarms-area">
         <div class="section-title">Alarms</div>
-        <div id="empty-state" class="empty-state">
-            <p>No alarms configured</p>
-            <button class="btn-add-alarm-large" onclick="openAddAlarm()">+ Add</button>
-        </div>
-        <div id="alarm-list-container" class="alarm-list" style="display: none;"></div>
+        <div id="alarm-list-container"></div>
+        <button class="btn-add-alarm-large" onclick="openAddAlarm()">+ Add</button>
     </section>
 
     <div id="menu-modal" class="menu-overlay" onclick="closeAddMenu()">
@@ -82,7 +79,7 @@
             </div>
             
             <div style="text-align: center; margin-top: 30px; color: var(--text-secondary); font-size: 13px;">
-                AQI Alarm v0.5<br>Powered by Open-Meteo
+                AQI Alarm v0.5.1<br>Powered by Open-Meteo
             </div>
         </div>
     </div>
