@@ -6,9 +6,13 @@ let currentAQIStandard = "US";
 let locations = [];
 let currentLocIndex = 0;
 let tempSelectedLocation = null;
-let editingAlarmIndex = null; // Track which alarm is being edited
+let editingAlarmIndex = null; 
 
-// Open-Meteo Endpoints
+// New State Variables for Ad-Hoc Location Logic
+let isAlarmLocationSearch = false;
+let adHocLocations = new Set(); // Stores strings of city names
+let lastDropdownIndex = 0; // To revert if user cancels search
+
 const API = {
     GEO: "https://geocoding-api.open-meteo.com/v1/search",
     AIR: "https://air-quality-api.open-meteo.com/v1/air-quality"
@@ -21,7 +25,7 @@ async function initData() {
     }
 }
 
-// --- UTILITY: STANDARDS & CALCULATION ---
+// --- UTILITY ---
 function getStandardMax(standard) {
     if (standard === 'UK') return 10;
     return 500;
@@ -34,7 +38,6 @@ function calculateAQI(pm25, standard = 'US') {
         'UK': [[0,11,1,1],[12,23,2,2],[24,35,3,3],[36,41,4,4],[42,47,5,5],[48,53,6,6],[54,58,7,7],[59,64,8,8],[65,70,9,9],[71,1000,10,10]],
         'IN': [[0,30,0,50],[31,60,51,100],[61,90,101,200],[91,120,201,300],[121,250,301,400],[250,999,401,500]]
     };
-
     const std = breakpoints[standard] || breakpoints['US'];
     for (let i = 0; i < std.length; i++) {
         const [cLow, cHigh, iLow, iHigh] = std[i];
@@ -75,8 +78,7 @@ function getColor(aqi, standard = 'US') {
     return "#7e0023";
 }
 
-// --- DATA FETCHING (OPEN-METEO) ---
-
+// --- DATA FETCHING ---
 async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
     try {
         if (lat === null || lon === null) {
@@ -135,17 +137,12 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
 async function refreshAllLocations() {
     const spinner = document.getElementById('refresh-spinner');
     spinner.classList.add('visible');
-
     const oldLocations = [...locations];
     locations = []; 
-    
     for (let loc of oldLocations) {
         await fetchAndAddLocation(loc.name, loc.isCurrent, loc.lat, loc.lon);
     }
-
-    setTimeout(() => {
-        spinner.classList.remove('visible');
-    }, 500);
+    setTimeout(() => { spinner.classList.remove('visible'); }, 500);
 }
 
 // --- RENDER DASHBOARD ---
@@ -162,18 +159,15 @@ function renderDashboard() {
         const currentAQI = calculateAQI(loc.rawCurrentPM25, currentAQIStandard);
         const status = getStatus(currentAQI, currentAQIStandard);
         const color = getColor(currentAQI, currentAQIStandard);
-        
         const iconHtml = loc.isCurrent 
             ? `<svg class="location-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"></path></svg>` 
             : '';
-
         const maxVal = getStandardMax(currentAQIStandard);
 
         const barsHtml = loc.rawForecast.map((d, i) => {
             const val = calculateAQI(d.rawVal, currentAQIStandard);
             const col = getColor(val, currentAQIStandard);
             const h = Math.min((val / maxVal) * 100, 100);
-
             let timeLabel = "";
             if (i % 4 === 0) { 
                 if (timeFormat === '24h') {
@@ -184,12 +178,10 @@ function renderDashboard() {
                     timeLabel = h12 + "" + suffix;
                 }
             }
-
             const hasActiveAlarm = alarms.some(a => a.active && parseInt(a.time.split(':')[0]) === d.hour);
             const markerHtml = hasActiveAlarm 
                 ? `<svg class="alarm-marker-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M22 5.72l-4.6-3.86-1.29 1.53 4.6 3.86L22 5.72zM7.88 3.39L6.6 1.86 2 5.71l1.29 1.53 4.59-3.85zM12.5 8H11v6l4.75 2.85.75-1.23-4-2.37V8zM12 4c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9-4.03-9-9-9zm0 16c-3.86 0-7-3.14-7-7s3.14-7 7-7 7 3.14 7 7-3.14 7-7 7z"/></svg>` 
                 : '';
-
             return `
                 <div class="forecast-column">
                     <div class="forecast-icon-area">${markerHtml}</div>
@@ -221,7 +213,8 @@ function renderDashboard() {
     dots.innerHTML = locations.map((_, i) => `<div class="dot ${i === currentLocIndex ? 'active' : ''}"></div>`).join('');
     slider.style.transform = `translateX(-${currentLocIndex * 100}%)`;
     
-    updateLocationDropdown();
+    // IMPORTANT: Don't call updateLocationDropdown here automatically to prevent overwriting "Search" mode logic during a background refresh
+    // unless the modal is closed. But for simplicity, we let the modal open logic handle refresh.
     renderSettingsLocations();
 }
 
@@ -230,15 +223,42 @@ function updateLocationDropdown() {
     const select = document.getElementById('new-location-select');
     if (!select) return;
     
-    if (locations.length === 0) {
-        select.innerHTML = '<option disabled>Loading locations...</option>';
-        return;
-    }
-
-    select.innerHTML = locations.map(loc => {
+    let html = '';
+    
+    // 1. Dashboard Locations
+    html += locations.map(loc => {
         const label = loc.isCurrent ? `${loc.name} (Current)` : loc.name;
         return `<option value="${loc.name}">${label}</option>`;
     }).join('');
+
+    // 2. Ad-Hoc Locations (Added via Search in Alarm flow)
+    // Filter out duplicates that are already on dashboard
+    adHocLocations.forEach(name => {
+        const exists = locations.some(l => l.name === name);
+        if (!exists) {
+            html += `<option value="${name}">${name}</option>`;
+        }
+    });
+
+    // 3. Search Option
+    html += `<option value="search_new" style="font-weight:bold; color:var(--accent-color);">+ Search New Location</option>`;
+
+    select.innerHTML = html;
+}
+
+// --- DROPDOWN CHANGE HANDLER (The New Logic) ---
+function handleLocationSelectChange(select) {
+    if (select.value === 'search_new') {
+        // Save index to revert if user cancels
+        // But since we just changed it, the current index is the last one
+        lastDropdownIndex = select.options.length - 1; 
+        
+        isAlarmLocationSearch = true;
+        openLocationSearch();
+    } else {
+        // Update index if user manually picked a normal location
+        lastDropdownIndex = select.selectedIndex;
+    }
 }
 
 function updateAQIStandard(newStd) {
@@ -251,15 +271,13 @@ function updateTimeFormat(val) {
     refreshAllLocations();
 }
 
-// --- PULL TO REFRESH & CAROUSEL ---
+// --- TOUCH HANDLING ---
 let touchStartY = 0;
 let isRefreshing = false;
 const dashArea = document.getElementById('aqi-area');
 
 dashArea.addEventListener('touchstart', (e) => { 
-    if (dashArea.scrollTop === 0) {
-        touchStartY = e.touches[0].clientY; 
-    }
+    if (dashArea.scrollTop === 0) { touchStartY = e.touches[0].clientY; }
     carouselStartX = e.touches[0].clientX;
 });
 
@@ -267,10 +285,7 @@ dashArea.addEventListener('touchmove', (e) => {
     const y = e.touches[0].clientY;
     if (touchStartY > 0 && y > touchStartY + 50 && !isRefreshing && dashArea.scrollTop === 0) {
         isRefreshing = true;
-        refreshAllLocations().then(() => {
-            isRefreshing = false;
-            touchStartY = 0;
-        });
+        refreshAllLocations().then(() => { isRefreshing = false; touchStartY = 0; });
     }
 });
 
@@ -282,7 +297,7 @@ dashArea.addEventListener('touchend', (e) => {
     else if (diff < -50 && currentLocIndex < locations.length - 1) { currentLocIndex++; renderDashboard(); }
 });
 
-// --- SEARCH & MENU ---
+// --- SEARCH ---
 let searchTimeout;
 function handleSearch(e) {
     const val = e.target.value;
@@ -315,27 +330,64 @@ function selectLocation(index, name, lat, lon) {
 
 async function confirmAddLocation() {
     if (!tempSelectedLocation) { alert("Please select a location first."); return; }
-    await fetchAndAddLocation(tempSelectedLocation.name, false, tempSelectedLocation.lat, tempSelectedLocation.lon);
-    closeLocationSearch();
+    
+    if (isAlarmLocationSearch) {
+        // ALARM FLOW: Just add to dropdown logic
+        const name = tempSelectedLocation.name;
+        adHocLocations.add(name);
+        
+        // Rebuild dropdown to include new ad-hoc location
+        updateLocationDropdown();
+        
+        // Auto-select the new location
+        const select = document.getElementById('new-location-select');
+        select.value = name;
+        
+        closeLocationSearch();
+        isAlarmLocationSearch = false; // Reset flag
+    } else {
+        // DASHBOARD FLOW: Add to main dashboard
+        await fetchAndAddLocation(tempSelectedLocation.name, false, tempSelectedLocation.lat, tempSelectedLocation.lon);
+        closeLocationSearch();
+    }
 }
 
-function closeLocationSearch() { document.getElementById('location-modal').style.display = 'none'; }
+function closeLocationSearch() { 
+    document.getElementById('location-modal').style.display = 'none'; 
+    // Handle cancel case for Alarm Search
+    if (isAlarmLocationSearch) {
+        // If user cancelled, revert dropdown
+        const select = document.getElementById('new-location-select');
+        // If we saved index 0, revert to 0. Usually safe.
+        // Actually, if they cancel, we probably want to deselect "Search".
+        // Setting it to index 0 is a safe fallback.
+        if (select) select.selectedIndex = 0;
+        isAlarmLocationSearch = false;
+    }
+}
+
 function openSettings() { renderSettingsLocations(); document.getElementById('settings-modal').style.display = 'flex'; }
 function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
 function openAddMenu() { document.getElementById('menu-modal').style.display = 'block'; }
 function closeAddMenu() { document.getElementById('menu-modal').style.display = 'none'; }
-function selectMenuOption(opt) { closeAddMenu(); opt === 'alarm' ? openAddAlarm() : openLocationSearch(); }
+// Ensure standard "Add Location" button resets the flag
+function selectMenuOption(opt) { 
+    closeAddMenu(); 
+    if (opt === 'alarm') openAddAlarm(); 
+    else {
+        isAlarmLocationSearch = false;
+        openLocationSearch();
+    }
+}
 
 function openAddAlarm() {
-    // 1. Reset Arrays & UI
     selectedDays = []; 
-    editingAlarmIndex = null; // IMPORTANT: Reset edit mode
+    editingAlarmIndex = null;
     document.getElementById('modal-title').innerText = "New Alarm";
     document.querySelectorAll('.day-btn').forEach(btn => btn.classList.remove('selected'));
     
     updateLocationDropdown();
     
-    // Reset Form
     document.getElementById('new-time').value = "07:00";
     document.getElementById('new-label').value = ""; 
     document.getElementById('new-aqi').value = "100";
@@ -354,15 +406,26 @@ function openEditAlarm(index) {
     
     document.getElementById('modal-title').innerText = "Edit Alarm";
     
-    // Populate Form
+    // Check if alarm location is ad-hoc (not in dashboard locations)
+    // If so, add it to adHoc list first so it appears in dropdown
+    const locExists = locations.some(l => l.name === alarm.location);
+    if (!locExists) {
+        adHocLocations.add(alarm.location);
+    }
+    
+    updateLocationDropdown();
+
     document.getElementById('new-time').value = alarm.time;
     document.getElementById('new-label').value = alarm.label;
-    document.getElementById('new-location-select').value = alarm.location;
+    
+    // Select the location
+    const locSelect = document.getElementById('new-location-select');
+    locSelect.value = alarm.location;
+
     document.getElementById('new-aqi-op').value = alarm.conditions[0].operator;
     document.getElementById('new-aqi').value = alarm.conditions[0].value;
     document.getElementById('new-sound').value = alarm.sound;
 
-    // Populate Days
     selectedDays = alarm.repeat.includes("Never") ? [] : [...alarm.repeat];
     document.querySelectorAll('.day-btn').forEach(btn => {
         const day = btn.getAttribute('data-day');
@@ -370,15 +433,17 @@ function openEditAlarm(index) {
         else btn.classList.remove('selected');
     });
 
-    closeAddMenu(); // Close the menu if open (rare case)
+    closeAddMenu();
     document.getElementById('add-modal').style.display = 'flex';
 }
 
 function closeAddAlarm() { document.getElementById('add-modal').style.display = 'none'; }
 function openLocationSearch() {
-    document.getElementById('loc-search-input').value = ""; document.getElementById('search-results').innerHTML = "";
+    document.getElementById('loc-search-input').value = ""; 
+    document.getElementById('search-results').innerHTML = "";
     document.getElementById('location-modal').style.display = 'flex';
 }
+
 function removeLocation(index) {
     const realIndex = index + 1; 
     if (realIndex >= locations.length) return;
@@ -386,6 +451,7 @@ function removeLocation(index) {
     if (currentLocIndex >= locations.length) currentLocIndex = locations.length - 1;
     renderDashboard();
 }
+
 function renderSettingsLocations() {
     const container = document.getElementById('settings-location-list');
     const removableLocs = locations.slice(1);
@@ -402,13 +468,18 @@ function renderSettingsLocations() {
 }
 
 function saveAlarm() {
-    // Validation
     const timeVal = document.getElementById('new-time').value;
     const aqiVal = document.getElementById('new-aqi').value;
     const locVal = document.getElementById('new-location-select').value;
 
     if (!timeVal || !aqiVal) {
         alert("Please set a time and AQI threshold.");
+        return;
+    }
+    
+    // Prevent saving if user left it on "Search New Location"
+    if (locVal === 'search_new') {
+        alert("Please select a valid location.");
         return;
     }
 
@@ -423,10 +494,8 @@ function saveAlarm() {
     };
 
     if (editingAlarmIndex !== null) {
-        // Update Existing
         alarms[editingAlarmIndex] = alarmData;
     } else {
-        // Create New
         alarms.push(alarmData);
     }
 
@@ -437,7 +506,6 @@ function saveAlarm() {
 
 function toggleAlarm(index) { alarms[index].active = !alarms[index].active; renderDashboard(); }
 
-// --- NEW DAY TOGGLE LOGIC ---
 function toggleDay(btn) {
     const day = btn.getAttribute('data-day');
     if (selectedDays.includes(day)) {
@@ -449,7 +517,6 @@ function toggleDay(btn) {
     }
 }
 
-// --- ALARM LIST & SWIPE LOGIC ---
 function renderAlarms() {
     const listContainer = document.getElementById('alarm-list-container');
     listContainer.innerHTML = alarms.map((alarm, index) => {
@@ -487,7 +554,6 @@ let alarmCurrentSwipeIndex = -1;
 function handleAlarmTouchStart(e, index) {
     alarmTouchStartX = e.touches[0].clientX;
     alarmCurrentSwipeIndex = index;
-    // Close others
     document.querySelectorAll('.alarm-row-content').forEach(row => {
         if(row.id !== `row-${index}`) row.style.transform = `translateX(0px)`;
     });
@@ -497,7 +563,6 @@ function handleAlarmTouchMove(e, index) {
     if (alarmCurrentSwipeIndex !== index) return;
     const diff = e.touches[0].clientX - alarmTouchStartX;
     const row = document.getElementById(`row-${index}`);
-    // Allow swipe left (negative diff), cap at -150px (approx button width)
     if (diff < 0 && diff > -160) {
         row.style.transform = `translateX(${diff}px)`;
     }
@@ -506,11 +571,10 @@ function handleAlarmTouchMove(e, index) {
 function handleAlarmTouchEnd(e, index) {
     const row = document.getElementById(`row-${index}`);
     const diff = e.changedTouches[0].clientX - alarmTouchStartX;
-    // Threshold to snap open
     if (diff < -60) {
-        row.style.transform = `translateX(-150px)`; // Snap open to reveal 2 buttons
+        row.style.transform = `translateX(-150px)`; 
     } else {
-        row.style.transform = `translateX(0px)`; // Snap close
+        row.style.transform = `translateX(0px)`; 
     }
 }
 
