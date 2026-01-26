@@ -5,7 +5,7 @@ let timeFormat = "24h";
 let currentAQIStandard = "US";
 let currentTheme = "dark"; 
 let primaryIndex = "aqi"; // Default to overall AQI
-let tempUnit = "C"; 
+let unitSystem = "metric"; // 'metric' or 'imperial'
 let locations = [];
 let currentLocIndex = 0;
 let tempSelectedLocation = null;
@@ -103,24 +103,76 @@ async function initData() {
     setInterval(checkAlarms, 1000);
 }
 
-// --- UTILITY: DATA NORMALIZATION ---
+// --- NEW: CONDITION COLOR LOGIC (IDEAL RANGES) ---
+// Returns hex color based on "ideal cycling conditions"
+function getConditionColor(metric, val) {
+    if (['aqi', 'pm25', 'pm10', 'no2', 'so2', 'o3', 'co'].includes(metric)) {
+        // Pollutants use standard AQI scale (Green -> Red)
+        // Note: For raw pollutants this is approximate, but fine for UI feedback
+        // If metric is AQI, val is AQI.
+        let v = val;
+        if (metric !== 'aqi') v = calculateAQI(val); // approximated index
+        return getColor(v, 'US'); 
+    }
+    
+    // --- WEATHER SCALES ---
+    // All inputs here are assumed METRIC (C, m/s) because internal storage is metric
+    
+    if (metric === 'temp') {
+        // Ideal: 15-25 C (Green)
+        // Ok: 5-15 or 25-32 (Yellow)
+        // Bad: <5 or >32 (Red)
+        if (val >= 15 && val <= 25) return "var(--success-color)";
+        if ((val >= 5 && val < 15) || (val > 25 && val <= 32)) return "var(--aqi-moderate)";
+        return "var(--danger-color)";
+    }
+    
+    if (metric === 'humidity') {
+        // Ideal: 40-60% (Green)
+        // Ok: 30-40 or 60-80 (Yellow)
+        // Bad: <30 or >80 (Red)
+        if (val >= 40 && val <= 60) return "var(--success-color)";
+        if ((val >= 30 && val < 40) || (val > 60 && val <= 80)) return "var(--aqi-moderate)";
+        return "var(--danger-color)";
+    }
+    
+    if (metric === 'wind') {
+        // Ideal: 0-5 m/s (Green) (0-18 km/h)
+        // Ok: 5-10 m/s (Yellow) (18-36 km/h)
+        // Bad: >10 m/s (Red) (>36 km/h)
+        if (val <= 5) return "var(--success-color)";
+        if (val <= 10) return "var(--aqi-moderate)";
+        return "var(--danger-color)";
+    }
+
+    return '#0A84FF'; // Default Blue
+}
+
+// --- UTILITY: DATA NORMALIZATION & DISPLAY ---
 function getMetricDisplay(metric, val) {
     if (val === undefined || val === null) return { val: '-', unit: '', label: metric, color: '#888' };
     
+    // Convert for Display
     let displayVal = val;
     let unit = '';
     
-    if (typeof tempUnit === 'undefined') tempUnit = 'C';
-
     if (metric === 'temp') {
-        if (tempUnit === 'F') {
+        if (unitSystem === 'imperial') {
             displayVal = (val * 9/5) + 32;
             unit = '°F';
         } else {
             unit = '°C';
         }
+    } else if (metric === 'wind') {
+        if (unitSystem === 'imperial') {
+            displayVal = val * 2.23694; // m/s to mph
+            unit = 'mph';
+        } else {
+            unit = 'm/s';
+        }
     }
 
+    // Units Label Map
     const meta = {
         'aqi': { unit: '', label: 'AQI' },
         'pm25': { unit: 'PM2.5', label: 'PM2.5' },
@@ -130,27 +182,12 @@ function getMetricDisplay(metric, val) {
         'o3': { unit: 'O₃', label: 'Ozone' },
         'co': { unit: 'CO', label: 'CO' },
         'temp': { unit: unit, label: 'Temp' }, 
-        'wind': { unit: 'km/h', label: 'Wind' },
+        'wind': { unit: unit, label: 'Wind' },
         'humidity': { unit: '%', label: 'Humidity' }
     }[metric] || { unit: '', label: metric };
 
-    // Colors
-    let color = '#fff';
-    if (['aqi', 'pm25', 'pm10', 'no2', 'so2', 'o3', 'co'].includes(metric)) {
-        let normVal = val; 
-        if (metric === 'aqi') normVal = val;
-        color = getColor(normVal, 'US'); 
-    } else if (metric === 'temp') {
-        // Temp coloring (use Celsius for logic)
-        if (val < 10) color = '#0A84FF'; 
-        else if (val > 30) color = '#FF453A'; 
-        else color = '#30D158'; 
-    } else if (metric === 'wind') {
-        if (val > 20) color = '#FF9500'; 
-        else color = '#30D158';
-    } else {
-        color = '#0A84FF'; 
-    }
+    // Get Color (Pass raw metric value for calculation logic)
+    const color = getConditionColor(metric, val);
 
     return { val: Math.round(displayVal), unit: meta.unit, label: meta.label, color: color };
 }
@@ -189,7 +226,7 @@ function getColor(aqi, standard = 'US') {
     return "#7e0023";
 }
 
-// --- DATA FETCHING (TRIPLE SOURCE) ---
+// --- DATA FETCHING ---
 async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
     try {
         if (lat === null || lon === null) {
@@ -203,6 +240,7 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
 
         const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
+        // Fetch 3 sources
         const [waqiRes, meteoAirRes, meteoWeatherRes] = await Promise.allSettled([
             fetch(`${API.AIR_WAQI}/geo:${lat};${lon}/?token=${WAQI_TOKEN}`),
             fetch(`${API.AIR_METEO}?latitude=${lat}&longitude=${lon}&current=pm2_5,pm10,nitrogen_dioxide,sulphur_dioxide,ozone,carbon_monoxide&hourly=pm2_5,pm10,nitrogen_dioxide,sulphur_dioxide,ozone,carbon_monoxide&timezone=${userTimezone}&timeformat=unixtime`),
@@ -219,45 +257,59 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
             forecast: {}
         };
 
+        // 1. Process WAQI (Current Reality)
         if (waqiRes.status === 'fulfilled') {
             const w = await waqiRes.value.json();
             if (w.status === 'ok' && w.data.iaqi) {
+                // Pollutants
                 if(w.data.iaqi.pm25) data.current.pm25 = w.data.iaqi.pm25.v;
                 if(w.data.iaqi.pm10) data.current.pm10 = w.data.iaqi.pm10.v;
                 if(w.data.iaqi.no2) data.current.no2 = w.data.iaqi.no2.v;
                 if(w.data.iaqi.so2) data.current.so2 = w.data.iaqi.so2.v;
                 if(w.data.iaqi.o3) data.current.o3 = w.data.iaqi.o3.v;
                 if(w.data.iaqi.co) data.current.co = w.data.iaqi.co.v;
-                if(w.data.iaqi.t) data.current.temp = w.data.iaqi.t.v;
-                if(w.data.iaqi.w) data.current.wind = w.data.iaqi.w.v * 3.6; 
+                
+                // Weather (Standardize to Metric internally: C, m/s)
+                if(w.data.iaqi.t) data.current.temp = w.data.iaqi.t.v; // WAQI is C
+                if(w.data.iaqi.w) data.current.wind = w.data.iaqi.w.v; // WAQI is m/s
                 if(w.data.iaqi.h) data.current.humidity = w.data.iaqi.h.v;
             }
         }
 
+        // 2. Process Meteo Air (Forecast)
         if (meteoAirRes.status === 'fulfilled') {
             const m = await meteoAirRes.value.json();
+            // Fallback Current
             if(data.current.pm25 === undefined && m.current) data.current.pm25 = m.current.pm2_5;
+            
+            // Forecasts
             data.forecast.pm25 = m.hourly.pm2_5;
             data.forecast.pm10 = m.hourly.pm10;
             data.forecast.no2 = m.hourly.nitrogen_dioxide;
             data.forecast.so2 = m.hourly.sulphur_dioxide;
             data.forecast.o3 = m.hourly.ozone;
             data.forecast.co = m.hourly.carbon_monoxide;
+            
             if (m.hourly.pm2_5) {
                 data.forecast.aqi = m.hourly.pm2_5.map(v => calculateAQI(v, currentAQIStandard));
             }
         }
 
+        // 3. Process Meteo Weather (Forecast)
         if (meteoWeatherRes.status === 'fulfilled') {
             const mw = await meteoWeatherRes.value.json();
+            // Fallback Current
             if(data.current.temp === undefined && mw.current) data.current.temp = mw.current.temperature_2m;
-            if(data.current.wind === undefined && mw.current) data.current.wind = mw.current.wind_speed_10m;
+            if(data.current.wind === undefined && mw.current) data.current.wind = mw.current.wind_speed_10m / 3.6; // Convert km/h to m/s for consistency
             if(data.current.humidity === undefined && mw.current) data.current.humidity = mw.current.relative_humidity_2m;
+
+            // Forecasts
             data.forecast.temp = mw.hourly.temperature_2m;
-            data.forecast.wind = mw.hourly.wind_speed_10m;
+            data.forecast.wind = mw.hourly.wind_speed_10m.map(v => v / 3.6); // Convert all to m/s
             data.forecast.humidity = mw.hourly.relative_humidity_2m;
         }
 
+        // Calculate AQI
         if (data.current.pm25 !== undefined) {
             data.current.aqi = calculateAQI(data.current.pm25, currentAQIStandard);
         }
@@ -273,7 +325,6 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
 
 async function refreshAllLocations() {
     const spinner = document.getElementById('refresh-spinner');
-    // Ensure spinner is not null
     if(spinner) spinner.classList.add('visible');
     
     const oldLocations = [...locations];
@@ -281,7 +332,6 @@ async function refreshAllLocations() {
     for (let loc of oldLocations) {
         await fetchAndAddLocation(loc.name, loc.isCurrent, loc.lat, loc.lon);
     }
-    
     if(spinner) setTimeout(() => { spinner.classList.remove('visible'); }, 500);
 }
 
@@ -305,11 +355,12 @@ function renderDashboard() {
 
         const forecastArr = loc.forecast[primaryIndex] || loc.forecast['aqi'] || [];
         
+        // Scale charts intelligently
         let maxVal = 100; 
         if(primaryIndex === 'aqi') maxVal = 500;
-        else if(primaryIndex === 'temp') maxVal = 40;
+        else if(primaryIndex === 'temp') maxVal = 40; 
         else if(primaryIndex === 'humidity') maxVal = 100;
-        else if(primaryIndex === 'wind') maxVal = 50;
+        else if(primaryIndex === 'wind') maxVal = 20; // 20 m/s is quite high (~72km/h)
         else if (forecastArr.length > 0) maxVal = Math.max(...forecastArr) || 100;
 
         const currentHourIndex = new Date().getHours(); 
@@ -320,7 +371,9 @@ function renderDashboard() {
             if (idx < forecastArr.length) {
                 const val = forecastArr[idx];
                 const h = Math.min((Math.max(val,0) / maxVal) * 100, 100); 
-                const barDisp = getMetricDisplay(primaryIndex, val);
+                
+                // Get Color based on Metric Ideal Range
+                const barColor = getConditionColor(primaryIndex, val);
                 
                 let timeLabel = "";
                 const hour = (currentHourIndex + i) % 24;
@@ -338,7 +391,7 @@ function renderDashboard() {
                     <div class="forecast-column">
                         <div class="forecast-icon-area">${markerHtml}</div>
                         <div class="forecast-bar-area">
-                            <div class="forecast-bar" style="height: ${h}%; background-color: ${barDisp.color};"></div>
+                            <div class="forecast-bar" style="height: ${h}%; background-color: ${barColor};"></div>
                         </div>
                         <div class="forecast-time">${timeLabel ? `<span>${timeLabel}</span>` : ''}</div>
                     </div>
@@ -362,12 +415,10 @@ function renderDashboard() {
     `}).join('');
 
     dots.innerHTML = locations.map((_, i) => `<div class="dot ${i === currentLocIndex ? 'active' : ''}"></div>`).join('');
-    // Use JS to set translation
     slider.style.transform = `translateX(-${currentLocIndex * 100}%)`;
     renderSettingsLocations();
 }
 
-// --- UI HELPERS ---
 function updateLocationDropdown() {
     const select = document.getElementById('new-location-select');
     if (!select) return;
@@ -417,7 +468,7 @@ function updateTimeFormat(val) {
 }
 
 function updateTempUnit(val) {
-    tempUnit = val;
+    unitSystem = val;
     renderDashboard();
 }
 
@@ -426,32 +477,17 @@ function updatePrimaryIndex(val) {
     renderDashboard();
 }
 
-// --- NEW PULL TO REFRESH & TOUCH LOGIC ---
+// --- TOUCH & UI BOILERPLATE ---
+// (Keep all touch handling, search, modal functions same as before)
 let touchStartX = 0;
 let touchStartY = 0;
 let isRefreshing = false;
 const dashArea = document.getElementById('aqi-area');
-const slider = document.getElementById('dashboard-slider'); // Ensure we target the slider for transforms
+const slider = document.getElementById('dashboard-slider'); 
 
-// We need an element for the spinner. In the HTML it is `.refresh-container` > `.spinner-icon`.
-// But wait, the HTML provided in previous step has `.refresh-spinner` in body.
-// I will create the `.refresh-container` dynamically if it doesn't exist or use the one in body?
-// The prompt said "The spinner sits behind the dashboard".
-// Let's modify the DOM slightly in JS to insert the spinner structure if we want "behind"
-// OR we just use the existing one and animate it.
-// The provided CSS has `.refresh-container` which is `z-index: 0`.
-// `#aqi-area` is `z-index: 1` (implied or set).
-// We need to inject the refresh container into `aqi-area` BEFORE `dashboard-slider`?
-// No, `aqi-area` has `overflow: hidden`.
-// Better strategy:
-// 1. Create a `refresh-container` in JS and prepend to `aqi-area`.
-// 2. Translate `dashboard-slider` down.
-
-// Create the spinner container dynamically to match the CSS expectation
 const refreshContainer = document.createElement('div');
 refreshContainer.className = 'refresh-container';
 refreshContainer.innerHTML = '<svg viewBox="0 0 50 50" class="spinner-icon"><circle cx="25" cy="25" r="20" fill="none" stroke="currentColor" stroke-width="4"></circle></svg>';
-// Prepend to aqi-area
 dashArea.insertBefore(refreshContainer, slider);
 
 dashArea.addEventListener('touchstart', (e) => { 
@@ -463,33 +499,17 @@ dashArea.addEventListener('touchstart', (e) => {
 
 dashArea.addEventListener('touchmove', (e) => {
     if (isRefreshing) return;
-
     const x = e.touches[0].clientX;
     const y = e.touches[0].clientY;
     const diffX = x - touchStartX;
     const diffY = y - touchStartY;
-
-    // Detect if vertical pull or horizontal swipe
-    if (Math.abs(diffX) > Math.abs(diffY)) {
-        // Horizontal Swipe (Carousel) - handled by end event mostly, but we can track
-        return; 
-    }
-
-    // Vertical Pull (Refresh)
+    if (Math.abs(diffX) > Math.abs(diffY)) return; 
     if (diffY > 0 && dashArea.scrollTop === 0) {
-        // Prevent default only if we are strictly pulling down at top
         if (e.cancelable) e.preventDefault(); 
-        
-        // Resistance
-        const translate = Math.min(diffY * 0.4, 150); // Cap at 150px
+        const translate = Math.min(diffY * 0.4, 150); 
         const rotate = diffY * 2;
-        
-        // Move slider down
-        // Note: we must preserve current X translation of the carousel
         slider.style.transition = 'none';
         slider.style.transform = `translateX(-${currentLocIndex * 100}%) translateY(${translate}px)`;
-        
-        // Animate Spinner
         const spinner = refreshContainer.querySelector('.spinner-icon');
         spinner.style.opacity = Math.min(diffY / 100, 1);
         spinner.style.transform = `rotate(${rotate}deg)`;
@@ -498,20 +518,14 @@ dashArea.addEventListener('touchmove', (e) => {
 
 dashArea.addEventListener('touchend', (e) => {
     if (isRefreshing) return;
-
     const diffX = e.changedTouches[0].clientX - touchStartX;
     const diffY = e.changedTouches[0].clientY - touchStartY;
-
-    // Check Pull-to-Refresh threshold
     if (Math.abs(diffY) > Math.abs(diffX) && diffY > 80 && dashArea.scrollTop === 0) {
-        // Trigger Refresh
         isRefreshing = true;
         slider.style.transition = 'transform 0.3s ease-out';
-        slider.style.transform = `translateX(-${currentLocIndex * 100}%) translateY(60px)`; // Snap to loading pos
-        
+        slider.style.transform = `translateX(-${currentLocIndex * 100}%) translateY(60px)`;
         const spinner = refreshContainer.querySelector('.spinner-icon');
         spinner.classList.add('spinning');
-        
         refreshAllLocations().then(() => {
             isRefreshing = false;
             spinner.classList.remove('spinning');
@@ -520,14 +534,10 @@ dashArea.addEventListener('touchend', (e) => {
         });
         return;
     }
-
-    // Reset Vertical Pull if not triggered
     if (diffY > 0) {
         slider.style.transition = 'transform 0.3s ease-out';
         slider.style.transform = `translateX(-${currentLocIndex * 100}%) translateY(0)`;
     }
-
-    // Handle Carousel Swipe
     if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
         if (diffX > 0 && currentLocIndex > 0) currentLocIndex--;
         else if (diffX < 0 && currentLocIndex < locations.length - 1) currentLocIndex++;
@@ -535,15 +545,12 @@ dashArea.addEventListener('touchend', (e) => {
     }
 });
 
-// --- SEARCH ---
-// (Search logic remains same)
 function handleSearch(e) {
     const val = e.target.value;
     const resultsDiv = document.getElementById('search-results');
     tempSelectedLocation = null; 
     clearTimeout(searchTimeout);
     if (val.length < 3) { resultsDiv.innerHTML = ""; return; }
-
     searchTimeout = setTimeout(async () => {
         try {
             const res = await fetch(`${API.GEO}?name=${val}&count=5&language=en&format=json`);
@@ -568,7 +575,6 @@ function selectLocation(index, name, lat, lon) {
 
 async function confirmAddLocation() {
     if (!tempSelectedLocation) { alert("Please select a location first."); return; }
-    
     if (isAlarmLocationSearch) {
         const name = tempSelectedLocation.name;
         adHocLocations.add(name);
@@ -612,21 +618,17 @@ function openAddAlarm() {
     document.querySelectorAll('.day-btn').forEach(btn => btn.classList.remove('selected'));
     audio.init();
     updateLocationDropdown();
-    
     document.getElementById('new-time').value = "07:00";
     document.getElementById('new-label').value = ""; 
     document.getElementById('new-aqi').value = "100";
     document.getElementById('new-aqi-op').value = "lt"; 
     document.getElementById('new-sound').value = "radar";
-    
     document.getElementById('new-snooze-toggle').checked = false;
     document.getElementById('new-snooze-duration').value = "9";
     document.getElementById('new-snooze-retain').checked = true;
     toggleSnoozeOptions();
-
     const locSelect = document.getElementById('new-location-select');
     if (locSelect.options.length > 0) locSelect.selectedIndex = 0;
-
     document.getElementById('add-modal').style.display = 'flex';
 }
 
@@ -635,86 +637,44 @@ function openEditAlarm(index) {
     const alarm = alarms[index];
     document.getElementById('modal-title').innerText = "Edit Alarm";
     audio.init();
-
     const locExists = locations.some(l => l.name === alarm.location);
-    if (!locExists) {
-        adHocLocations.add(alarm.location);
-    }
+    if (!locExists) { adHocLocations.add(alarm.location); }
     updateLocationDropdown();
-
     document.getElementById('new-time').value = alarm.time;
     document.getElementById('new-label').value = alarm.label;
     document.getElementById('new-location-select').value = alarm.location;
-    
     if(alarm.conditions && alarm.conditions.length > 0) {
         document.getElementById('new-alarm-metric').value = alarm.conditions[0].metric || 'aqi';
         document.getElementById('new-aqi-op').value = alarm.conditions[0].operator;
         document.getElementById('new-aqi').value = alarm.conditions[0].value;
     }
-
     document.getElementById('new-sound').value = alarm.sound;
     document.getElementById('new-snooze-toggle').checked = !!alarm.snoozeEnabled;
     document.getElementById('new-snooze-duration').value = alarm.snoozeDuration || 9;
     document.getElementById('new-snooze-retain').checked = (alarm.snoozeRetainSettings !== false);
     toggleSnoozeOptions();
-
     selectedDays = alarm.repeat.includes("Never") ? [] : [...alarm.repeat];
     document.querySelectorAll('.day-btn').forEach(btn => {
         const day = btn.getAttribute('data-day');
         if (selectedDays.includes(day)) btn.classList.add('selected');
         else btn.classList.remove('selected');
     });
-
     closeAddMenu();
     document.getElementById('add-modal').style.display = 'flex';
 }
 
 function closeAddAlarm() { document.getElementById('add-modal').style.display = 'none'; }
-function openLocationSearch() {
-    document.getElementById('loc-search-input').value = ""; 
-    document.getElementById('search-results').innerHTML = "";
-    document.getElementById('location-modal').style.display = 'flex';
-}
-
-function removeLocation(index) {
-    const realIndex = index + 1; 
-    if (realIndex >= locations.length) return;
-    locations.splice(realIndex, 1);
-    if (currentLocIndex >= locations.length) currentLocIndex = locations.length - 1;
-    renderDashboard();
-}
-
-function renderSettingsLocations() {
-    const container = document.getElementById('settings-location-list');
-    const removableLocs = locations.slice(1);
-    if (removableLocs.length === 0) {
-        container.innerHTML = `<div class="settings-row" style="color: var(--text-secondary); font-size: 14px;">No added locations</div>`;
-    } else {
-        container.innerHTML = removableLocs.map((loc, i) => `
-            <div class="settings-row">
-                <span class="settings-label">${loc.name}</span>
-                <button class="settings-delete-btn" onclick="removeLocation(${i})">Remove</button>
-            </div>
-        `).join('');
-    }
-}
+function openLocationSearch() { document.getElementById('loc-search-input').value = ""; document.getElementById('search-results').innerHTML = ""; document.getElementById('location-modal').style.display = 'flex'; }
+function removeLocation(index) { const realIndex = index + 1; if (realIndex >= locations.length) return; locations.splice(realIndex, 1); if (currentLocIndex >= locations.length) currentLocIndex = locations.length - 1; renderDashboard(); }
+function renderSettingsLocations() { const container = document.getElementById('settings-location-list'); const removableLocs = locations.slice(1); if (removableLocs.length === 0) { container.innerHTML = `<div class="settings-row" style="color: var(--text-secondary); font-size: 14px;">No added locations</div>`; } else { container.innerHTML = removableLocs.map((loc, i) => ` <div class="settings-row"> <span class="settings-label">${loc.name}</span> <button class="settings-delete-btn" onclick="removeLocation(${i})">Remove</button> </div> `).join(''); } }
 
 function saveAlarm() {
     const timeVal = document.getElementById('new-time').value;
     const val = document.getElementById('new-aqi').value;
     const locVal = document.getElementById('new-location-select').value;
     const metricVal = document.getElementById('new-alarm-metric').value; 
-
-    if (!timeVal || !val) {
-        alert("Please set a time and value.");
-        return;
-    }
-    
-    if (locVal === 'search_new') {
-        alert("Please select a valid location.");
-        return;
-    }
-
+    if (!timeVal || !val) { alert("Please set a time and value."); return; }
+    if (locVal === 'search_new') { alert("Please select a valid location."); return; }
     const alarmData = { 
         time: timeVal, 
         label: document.getElementById('new-label').value, 
@@ -727,116 +687,29 @@ function saveAlarm() {
         snoozeDuration: parseInt(document.getElementById('new-snooze-duration').value) || 9,
         snoozeRetainSettings: document.getElementById('new-snooze-retain').checked
     };
-
-    if (editingAlarmIndex !== null) {
-        alarms[editingAlarmIndex] = alarmData;
-    } else {
-        alarms.push(alarmData);
-    }
-
-    renderAlarms(); 
-    renderDashboard(); 
-    closeAddAlarm();
+    if (editingAlarmIndex !== null) { alarms[editingAlarmIndex] = alarmData; } else { alarms.push(alarmData); }
+    renderAlarms(); renderDashboard(); closeAddAlarm();
 }
 
 function toggleAlarm(index) { alarms[index].active = !alarms[index].active; renderDashboard(); }
-
-function toggleDay(btn) {
-    const day = btn.getAttribute('data-day');
-    if (selectedDays.includes(day)) {
-        selectedDays = selectedDays.filter(d => d !== day);
-        btn.classList.remove('selected');
-    } else {
-        selectedDays.push(day);
-        btn.classList.add('selected');
-    }
-}
-
-function renderAlarms() {
-    const listContainer = document.getElementById('alarm-list-container');
-    listContainer.innerHTML = alarms.map((alarm, index) => {
-        const cond = alarm.conditions[0];
-        const op = cond.operator === 'gt' ? '>' : '<';
-        const metric = cond.metric ? cond.metric.toUpperCase() : 'AQI';
-        return `
-        <div class="alarm-container">
-            <div class="alarm-swipe-actions">
-                <button class="swipe-btn edit" onclick="openEditAlarm(${index})">Edit</button>
-                <button class="swipe-btn delete" onclick="deleteAlarm(${index})">
-                    <svg class="trash-icon" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-                </button>
-            </div>
-            <div class="alarm-row-content" id="row-${index}"
-                    ontouchstart="handleAlarmTouchStart(event, ${index})"
-                    ontouchmove="handleAlarmTouchMove(event, ${index})"
-                    ontouchend="handleAlarmTouchEnd(event, ${index})">
-                <div class="alarm-info">
-                    <div class="alarm-top-line"><span class="alarm-time">${alarm.time}</span><span class="alarm-condition">${metric} ${op} ${cond.value}</span></div>
-                    ${alarm.label ? `<div class="alarm-label">${alarm.label}</div>` : ''}
-                    <div class="alarm-details">${alarm.location} • ${formatDays(alarm.repeat)}</div>
-                </div>
-                <label class="switch">
-                    <input type="checkbox" ${alarm.active ? 'checked' : ''} onchange="toggleAlarm(${index})">
-                    <span class="slider"></span>
-                </label>
-            </div>
-        </div>
-    `}).join('');
-}
-
-let alarmTouchStartX = 0;
-let alarmCurrentSwipeIndex = -1;
-
-function handleAlarmTouchStart(e, index) {
-    alarmTouchStartX = e.touches[0].clientX;
-    alarmCurrentSwipeIndex = index;
-    document.querySelectorAll('.alarm-row-content').forEach(row => {
-        if(row.id !== `row-${index}`) row.style.transform = `translateX(0px)`;
-    });
-}
-
-function handleAlarmTouchMove(e, index) {
-    if (alarmCurrentSwipeIndex !== index) return;
-    const diff = e.touches[0].clientX - alarmTouchStartX;
-    const row = document.getElementById(`row-${index}`);
-    if (diff < 0 && diff > -160) {
-        row.style.transform = `translateX(${diff}px)`;
-    }
-}
-
-function handleAlarmTouchEnd(e, index) {
-    const row = document.getElementById(`row-${index}`);
-    const diff = e.changedTouches[0].clientX - alarmTouchStartX;
-    if (diff < -60) {
-        row.style.transform = `translateX(-150px)`; 
-    } else {
-        row.style.transform = `translateX(0px)`; 
-    }
-}
-
-function deleteAlarm(index) { 
-    alarms.splice(index, 1); 
-    renderAlarms(); 
-    renderDashboard(); 
-}
-
+function toggleDay(btn) { const day = btn.getAttribute('data-day'); if (selectedDays.includes(day)) { selectedDays = selectedDays.filter(d => d !== day); btn.classList.remove('selected'); } else { selectedDays.push(day); btn.classList.add('selected'); } }
+function renderAlarms() { const listContainer = document.getElementById('alarm-list-container'); listContainer.innerHTML = alarms.map((alarm, index) => { const cond = alarm.conditions[0]; const op = cond.operator === 'gt' ? '>' : '<'; const metric = cond.metric ? cond.metric.toUpperCase() : 'AQI'; return ` <div class="alarm-container"> <div class="alarm-swipe-actions"> <button class="swipe-btn edit" onclick="openEditAlarm(${index})">Edit</button> <button class="swipe-btn delete" onclick="deleteAlarm(${index})"> <svg class="trash-icon" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg> </button> </div> <div class="alarm-row-content" id="row-${index}" ontouchstart="handleAlarmTouchStart(event, ${index})" ontouchmove="handleAlarmTouchMove(event, ${index})" ontouchend="handleAlarmTouchEnd(event, ${index})"> <div class="alarm-info"> <div class="alarm-top-line"><span class="alarm-time">${alarm.time}</span><span class="alarm-condition">${metric} ${op} ${cond.value}</span></div> ${alarm.label ? `<div class="alarm-label">${alarm.label}</div>` : ''} <div class="alarm-details">${alarm.location} • ${formatDays(alarm.repeat)}</div> </div> <label class="switch"> <input type="checkbox" ${alarm.active ? 'checked' : ''} onchange="toggleAlarm(${index})"> <span class="slider"></span> </label> </div> </div> `}).join(''); }
+function deleteAlarm(index) { alarms.splice(index, 1); renderAlarms(); renderDashboard(); }
 function formatDays(days) { return days.includes("Never") ? "Once" : (days.length === 7 ? "Daily" : days.map(d => d.slice(0, 3)).join(", ")); }
+function toggleSnoozeOptions() { const toggle = document.getElementById('new-snooze-toggle'); const options = document.getElementById('snooze-options'); if (toggle.checked) { options.style.display = 'block'; const modalBody = document.querySelector('#add-modal .modal-body'); if (modalBody) { setTimeout(() => { modalBody.scrollTo({ top: modalBody.scrollHeight, behavior: 'smooth' }); }, 50); } } else { options.style.display = 'none'; } }
 
-function toggleSnoozeOptions() {
-    const toggle = document.getElementById('new-snooze-toggle');
-    const options = document.getElementById('snooze-options');
-    if (toggle.checked) {
-        options.style.display = 'block';
-        const modalBody = document.querySelector('#add-modal .modal-body');
-        if (modalBody) {
-            setTimeout(() => {
-                modalBody.scrollTo({ top: modalBody.scrollHeight, behavior: 'smooth' });
-            }, 50);
-        }
-    } else {
-        options.style.display = 'none';
-    }
-}
+// Check Alarms and Trigger Logic (Same as before)
+let lastCheckedMinuteCheck = null; 
+function checkAlarms() { const now = new Date(); const currentMinuteStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); if (lastCheckedMinuteCheck === currentMinuteStr) return; lastCheckedMinuteCheck = currentMinuteStr; const dayName = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"][now.getDay()]; alarms.forEach((alarm, index) => { if (!alarm.active) return; if (alarm.time !== currentMinuteStr) return; if (!alarm.repeat.includes("Never") && !alarm.repeat.includes(dayName)) return; let locData = null; if (alarm.location.includes("Current")) { locData = locations.find(l => l.isCurrent); } else { locData = locations.find(l => l.name === alarm.location); } if (!locData) return; const metric = (alarm.conditions[0].metric || 'aqi'); let currentVal = 0; if (metric === 'aqi') { currentVal = calculateAQI(locData.current.pm25); } else if (locData.current[metric] !== undefined) { currentVal = locData.current[metric]; } const threshold = parseInt(alarm.conditions[0].value); const op = alarm.conditions[0].operator; let conditionMet = false; if (op === 'lt' && currentVal < threshold) conditionMet = true; if (op === 'gt' && currentVal > threshold) conditionMet = true; if (conditionMet) { triggerAlarm(alarm, currentVal, locData.name, metric); if (alarm.repeat.includes("Never")) { alarm.active = false; renderAlarms(); } } }); }
+function triggerAlarm(alarm, val, locName, metric) { currentRingingAlarm = alarm; audio.play(alarm.sound); const overlay = document.getElementById('ring-overlay'); document.getElementById('ring-label').innerText = alarm.label || "Alarm"; const disp = getMetricDisplay(metric || 'aqi', val); document.getElementById('ring-condition').innerText = `${disp.label} is ${disp.val}${disp.unit}`; document.getElementById('ring-location').innerText = locName; document.getElementById('ring-time').innerText = alarm.time; const badge = document.getElementById('ring-aqi-badge'); badge.innerText = "Alert"; badge.style.backgroundColor = disp.color; const snoozeBtn = document.getElementById('btn-snooze'); if (alarm.snoozeEnabled) { snoozeBtn.style.display = 'block'; } else { snoozeBtn.style.display = 'none'; } overlay.style.display = 'flex'; }
+function stopAlarm() { audio.stop(); currentRingingAlarm = null; document.getElementById('ring-overlay').style.display = 'none'; }
+function snoozeAlarm() { if (!currentRingingAlarm) return; const duration = currentRingingAlarm.snoozeDuration ? parseInt(currentRingingAlarm.snoozeDuration) : 9; const now = new Date(); now.setMinutes(now.getMinutes() + duration); const snoozeTimeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); let newConditions = []; if (currentRingingAlarm.snoozeRetainSettings) { newConditions = [...currentRingingAlarm.conditions]; } else { newConditions = [{ metric: currentRingingAlarm.conditions[0].metric, operator: 'gt', value: -9999 }]; } const snoozeAlarmObj = { time: snoozeTimeStr, label: "Snoozing: " + (currentRingingAlarm.label || "Alarm"), location: currentRingingAlarm.location, conditions: newConditions, repeat: ["Never"], sound: currentRingingAlarm.sound, active: true, snoozeEnabled: true, snoozeDuration: duration, snoozeRetainSettings: currentRingingAlarm.snoozeRetainSettings }; alarms.push(snoozeAlarmObj); renderAlarms(); stopAlarm(); }
+
+// Keep Handle Touch
+let alarmTouchStartX2 = 0; let alarmCurrentSwipeIndex2 = -1; 
+function handleAlarmTouchStart(e, index) { alarmTouchStartX2 = e.touches[0].clientX; alarmCurrentSwipeIndex2 = index; document.querySelectorAll('.alarm-row-content').forEach(row => { if(row.id !== `row-${index}`) row.style.transform = `translateX(0px)`; }); }
+function handleAlarmTouchMove(e, index) { if (alarmCurrentSwipeIndex2 !== index) return; const diff = e.touches[0].clientX - alarmTouchStartX2; const row = document.getElementById(`row-${index}`); if (diff < 0 && diff > -160) { row.style.transform = `translateX(${diff}px)`; } }
+function handleAlarmTouchEnd(e, index) { const row = document.getElementById(`row-${index}`); const diff = e.changedTouches[0].clientX - alarmTouchStartX2; if (diff < -60) { row.style.transform = `translateX(-150px)`; } else { row.style.transform = `translateX(0px)`; } }
 
 initData();
 renderAlarms();
