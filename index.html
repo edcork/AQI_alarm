@@ -20,7 +20,7 @@
         <button class="icon-btn" onclick="openSettings()">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="3"></circle>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
             </svg>
         </button>
         <button class="icon-btn" onclick="openAddMenu()">
@@ -61,6 +61,13 @@
                 <div class="settings-section-title">General</div>
                 <div class="settings-list">
                     <div class="settings-row">
+                        <span class="settings-label">Theme</span>
+                        <select id="setting-theme" class="form-select settings-select" onchange="updateTheme(this.value)">
+                            <option value="dark" selected>Dark</option>
+                            <option value="light">Light</option>
+                        </select>
+                    </div>
+                    <div class="settings-row">
                         <span class="settings-label">AQI Standard</span>
                         <select id="setting-aqi-std" class="form-select settings-select" onchange="updateAQIStandard(this.value)">
                             <option value="US" selected>US (EPA)</option>
@@ -89,13 +96,6 @@
                             <option>English</option>
                             <option disabled>Coming soon...</option>
                         </select>
-                    </div>
-                    <div class="settings-row">
-                        <span class="settings-label">Dark Mode</span>
-                        <label class="switch">
-                            <input type="checkbox" id="setting-theme-toggle" checked onchange="updateTheme(this.checked)">
-                            <span class="slider"></span>
-                        </label>
                     </div>
                 </div>
             </div>
@@ -135,7 +135,7 @@
             </div>
             
             <div style="text-align: center; margin-top: 30px; color: var(--text-secondary); font-size: 13px;">
-                AQI Alarm v0.7.1<br>Powered by Open-Meteo
+                AQI Alarm v0.8<br>Powered by Open-Meteo & WAQI
             </div>
         </div>
     </div>
@@ -209,6 +209,21 @@
                 <button class="btn-pill cancel" onclick="closeLocationSearch()">Cancel</button>
                 <button class="btn-pill primary" onclick="confirmAddLocation()">Save</button>
             </div>
+        </div>
+    </div>
+
+    <div id="ring-overlay" class="ring-overlay">
+        <div class="ring-content">
+            <div class="ring-label" id="ring-label">Morning Run</div>
+            <div class="ring-condition" id="ring-condition">AQI is 45</div>
+            <div class="ring-location" id="ring-location">Shanghai</div>
+            <div class="ring-time" id="ring-time">07:00</div>
+            
+            <div class="ring-aqi-badge" id="ring-aqi-badge">
+                Good
+            </div>
+
+            <button class="btn-stop-alarm" onclick="stopAlarm()">Stop</button>
         </div>
     </div>
 
