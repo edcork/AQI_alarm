@@ -531,19 +531,25 @@ function handleSearch(e) {
     const resultsDiv = document.getElementById('search-results');
     tempSelectedLocation = null; 
     clearTimeout(searchTimeout);
-    if (val.length < 3) { resultsDiv.innerHTML = ""; return; }
+    
+    // UPDATED: Threshold lowered to 2 characters
+    if (val.length < 2) { resultsDiv.innerHTML = ""; return; }
+    
     searchTimeout = setTimeout(async () => {
         try {
-            // FIXED: Added encodeURIComponent to prevent URL errors with spaces
+            // FIXED: URL Encode to handle spaces (e.g. "San Francisco")
             const res = await fetch(`${API.GEO}?name=${encodeURIComponent(val)}&count=5&language=en&format=json`);
             const data = await res.json();
-            if(data.results) {
+            if(data.results && data.results.length > 0) {
                 resultsDiv.innerHTML = data.results.map((city, index) => `
                     <div id="search-item-${index}" class="search-item" onclick="selectLocation(${index}, '${city.name.replace(/'/g, "\\'")}', ${city.latitude}, ${city.longitude})">
                         <div class="search-item-city">${city.name}</div>
                         <div class="search-item-country">${city.country}</div>
                     </div>
                 `).join('');
+            } else {
+                // FIXED: Explicit "No Results" state
+                resultsDiv.innerHTML = '<div style="padding:15px; text-align:center; color:var(--text-secondary);">No results found</div>';
             }
         } catch(e) { console.log(e); }
     }, 500);
