@@ -5,7 +5,6 @@ let timeFormat = "24h";
 let currentAQIStandard = "US";
 let currentTheme = "dark"; 
 let primaryIndex = "aqi"; // Default to overall AQI
-let tempUnit = "C"; // NEW: Default Celsius
 let locations = [];
 let currentLocIndex = 0;
 let tempSelectedLocation = null;
@@ -16,6 +15,7 @@ let adHocLocations = new Set();
 let lastDropdownIndex = 0;
 let currentRingingAlarm = null;
 
+// --- API CONFIGURATION ---
 const WAQI_TOKEN = "da26d3ac784af6fd3950dd9958e7a1df4e8f12b6"; 
 const API = {
     GEO: "https://geocoding-api.open-meteo.com/v1/search",
@@ -24,7 +24,7 @@ const API = {
     AIR_WAQI: "https://api.waqi.info/feed"
 };
 
-// --- SOUND ENGINE ---
+// --- SOUND ENGINE (Web Audio API) ---
 class SoundEngine {
     constructor() { this.ctx = null; this.osc = null; this.interval = null; }
     init() {
@@ -111,6 +111,9 @@ function getMetricDisplay(metric, val) {
     let displayVal = val;
     let unit = '';
     
+    // If tempUnit is not defined yet, default to C
+    if (typeof tempUnit === 'undefined') tempUnit = 'C';
+
     if (metric === 'temp') {
         if (tempUnit === 'F') {
             displayVal = (val * 9/5) + 32;
@@ -155,6 +158,7 @@ function getMetricDisplay(metric, val) {
 }
 
 function calculateAQI(pm25, standard = 'US') {
+    if (pm25 === undefined || pm25 === null) return 0;
     const breakpoints = {
         'US': [[0,12,0,50],[12.1,35.4,51,100],[35.5,55.4,101,150],[55.5,150.4,151,200],[150.5,250.4,201,300],[250.5,350.4,301,400],[350.5,500.4,401,500]],
         'CN': [[0,35,0,50],[35,75,51,100],[75,115,101,150],[115,150,151,200],[150,250,201,300],[250,350,301,400],[350,500,401,500]],
@@ -169,6 +173,11 @@ function calculateAQI(pm25, standard = 'US') {
         }
     }
     return standard === 'UK' ? 10 : 500;
+}
+
+function getStandardMax(standard) {
+    if (standard === 'UK') return 10;
+    return 500;
 }
 
 function getStatus(aqi, standard = 'US') {
@@ -187,7 +196,7 @@ function getColor(aqi, standard = 'US') {
     return "#7e0023";
 }
 
-// --- DATA FETCHING ---
+// --- DATA FETCHING (FIXED LOGIC) ---
 async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
     try {
         if (lat === null || lon === null) {
@@ -201,6 +210,7 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
 
         const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
+        // Fetch 3 sources in parallel
         const [waqiRes, meteoAirRes, meteoWeatherRes] = await Promise.allSettled([
             fetch(`${API.AIR_WAQI}/geo:${lat};${lon}/?token=${WAQI_TOKEN}`),
             fetch(`${API.AIR_METEO}?latitude=${lat}&longitude=${lon}&current=pm2_5,pm10,nitrogen_dioxide,sulphur_dioxide,ozone,carbon_monoxide&hourly=pm2_5,pm10,nitrogen_dioxide,sulphur_dioxide,ozone,carbon_monoxide&timezone=${userTimezone}&timeformat=unixtime`),
@@ -213,10 +223,11 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
             lat: lat,
             lon: lon,
             time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: (timeFormat === '12h')}),
-            current: { aqi: 0 },
+            current: { aqi: 0 }, 
             forecast: {}
         };
 
+        // 1. Process WAQI
         if (waqiRes.status === 'fulfilled') {
             const w = await waqiRes.value.json();
             if (w.status === 'ok' && w.data.iaqi) {
@@ -226,33 +237,51 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
                 if(w.data.iaqi.so2) data.current.so2 = w.data.iaqi.so2.v;
                 if(w.data.iaqi.o3) data.current.o3 = w.data.iaqi.o3.v;
                 if(w.data.iaqi.co) data.current.co = w.data.iaqi.co.v;
+                
+                // Weather from WAQI
                 if(w.data.iaqi.t) data.current.temp = w.data.iaqi.t.v;
-                if(w.data.iaqi.w) data.current.wind = w.data.iaqi.w.v * 3.6; 
+                if(w.data.iaqi.w) data.current.wind = w.data.iaqi.w.v * 3.6; // m/s to km/h approx
                 if(w.data.iaqi.h) data.current.humidity = w.data.iaqi.h.v;
-                if(data.current.pm25) data.current.aqi = calculateAQI(data.current.pm25, currentAQIStandard);
             }
         }
 
+        // 2. Process Meteo Air
         if (meteoAirRes.status === 'fulfilled') {
             const m = await meteoAirRes.value.json();
-            if(!data.current.pm25 && m.current) data.current.pm25 = m.current.pm2_5;
+            // Fill current if missing (fallback)
+            if(data.current.pm25 === undefined && m.current) data.current.pm25 = m.current.pm2_5;
+            
+            // Build Forecasts
             data.forecast.pm25 = m.hourly.pm2_5;
             data.forecast.pm10 = m.hourly.pm10;
             data.forecast.no2 = m.hourly.nitrogen_dioxide;
             data.forecast.so2 = m.hourly.sulphur_dioxide;
             data.forecast.o3 = m.hourly.ozone;
             data.forecast.co = m.hourly.carbon_monoxide;
-            data.forecast.aqi = m.hourly.pm2_5.map(v => calculateAQI(v, currentAQIStandard));
+            
+            // Calculate Forecast AQI
+            if (m.hourly.pm2_5) {
+                data.forecast.aqi = m.hourly.pm2_5.map(v => calculateAQI(v, currentAQIStandard));
+            }
         }
 
+        // 3. Process Meteo Weather
         if (meteoWeatherRes.status === 'fulfilled') {
             const mw = await meteoWeatherRes.value.json();
-            if(!data.current.temp && mw.current) data.current.temp = mw.current.temperature_2m;
-            if(!data.current.wind && mw.current) data.current.wind = mw.current.wind_speed_10m;
-            if(!data.current.humidity && mw.current) data.current.humidity = mw.current.relative_humidity_2m;
+            // Fill current if missing
+            if(data.current.temp === undefined && mw.current) data.current.temp = mw.current.temperature_2m;
+            if(data.current.wind === undefined && mw.current) data.current.wind = mw.current.wind_speed_10m;
+            if(data.current.humidity === undefined && mw.current) data.current.humidity = mw.current.relative_humidity_2m;
+
+            // Build Forecasts
             data.forecast.temp = mw.hourly.temperature_2m;
             data.forecast.wind = mw.hourly.wind_speed_10m;
             data.forecast.humidity = mw.hourly.relative_humidity_2m;
+        }
+
+        // CRITICAL FIX: Calculate AQI *after* fallback logic
+        if (data.current.pm25 !== undefined) {
+            data.current.aqi = calculateAQI(data.current.pm25, currentAQIStandard);
         }
 
         if(isCurrent) locations.unshift(data);
@@ -286,20 +315,25 @@ function renderDashboard() {
     }
 
     slider.innerHTML = locations.map(loc => {
+        // Get values based on Primary Index
         const valObj = loc.current[primaryIndex] !== undefined ? loc.current[primaryIndex] : loc.current['aqi']; 
+        
+        // Use helper to get display props (Color, Label, Unit)
         const disp = getMetricDisplay(primaryIndex, valObj);
         
         const iconHtml = loc.isCurrent 
             ? `<svg class="location-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"></path></svg>` 
             : '';
 
+        // Forecast Chart
         const forecastArr = loc.forecast[primaryIndex] || loc.forecast['aqi'] || [];
+        
         let maxVal = 100; 
         if(primaryIndex === 'aqi') maxVal = 500;
         else if(primaryIndex === 'temp') maxVal = 40;
         else if(primaryIndex === 'humidity') maxVal = 100;
         else if(primaryIndex === 'wind') maxVal = 50;
-        else maxVal = Math.max(...forecastArr) || 100;
+        else if (forecastArr.length > 0) maxVal = Math.max(...forecastArr) || 100;
 
         const currentHourIndex = new Date().getHours(); 
         const barsHtml = [];
@@ -355,408 +389,15 @@ function renderDashboard() {
     renderSettingsLocations();
 }
 
-// --- UI HELPERS ---
-function updateLocationDropdown() {
-    const select = document.getElementById('new-location-select');
-    if (!select) return;
-    let html = '';
-    html += locations.map(loc => {
-        const label = loc.isCurrent ? `${loc.name} (Current)` : loc.name;
-        return `<option value="${loc.name}">${label}</option>`;
-    }).join('');
-    adHocLocations.forEach(name => {
-        const exists = locations.some(l => l.name === name);
-        if (!exists) {
-            html += `<option value="${name}">${name}</option>`;
-        }
-    });
-    html += `<option value="search_new" style="font-weight:bold; color:var(--accent-color);">+ Search New Location</option>`;
-    select.innerHTML = html;
-}
-
-function handleLocationSelectChange(select) {
-    if (select.value === 'search_new') {
-        lastDropdownIndex = select.options.length - 1; 
-        isAlarmLocationSearch = true;
-        openLocationSearch();
-    } else {
-        lastDropdownIndex = select.selectedIndex;
-    }
-}
-
-// --- UPDATED THEME LOGIC ---
-function updateTheme(isDark) {
-    if (isDark) {
-        currentTheme = "dark";
-        document.documentElement.removeAttribute('data-theme');
-    } else {
-        currentTheme = "light";
-        document.documentElement.setAttribute('data-theme', 'light');
-    }
-}
-
-function updateAQIStandard(newStd) {
-    currentAQIStandard = newStd;
-    renderDashboard(); 
-}
-
-function updateTimeFormat(val) {
-    timeFormat = val;
-    refreshAllLocations();
-}
-
-// --- UPDATED TEMP UNIT LOGIC ---
-function updateTempUnit(val) {
-    tempUnit = val;
-    renderDashboard();
-}
-
-function updatePrimaryIndex(val) {
-    primaryIndex = val;
-    renderDashboard();
-}
-
-// --- TOUCH HANDLING ---
-let touchStartY = 0;
-let isRefreshing = false;
-const dashArea = document.getElementById('aqi-area');
-
-dashArea.addEventListener('touchstart', (e) => { 
-    if (dashArea.scrollTop === 0) { touchStartY = e.touches[0].clientY; }
-    carouselStartX = e.touches[0].clientX;
-});
-
-dashArea.addEventListener('touchmove', (e) => {
-    const y = e.touches[0].clientY;
-    if (touchStartY > 0 && y > touchStartY + 50 && !isRefreshing && dashArea.scrollTop === 0) {
-        isRefreshing = true;
-        refreshAllLocations().then(() => { isRefreshing = false; touchStartY = 0; });
-    }
-});
-
-let carouselStartX = 0;
-dashArea.addEventListener('touchend', (e) => {
-    if (isRefreshing) return;
-    const diff = e.changedTouches[0].clientX - carouselStartX;
-    if (diff > 50 && currentLocIndex > 0) { currentLocIndex--; renderDashboard(); }
-    else if (diff < -50 && currentLocIndex < locations.length - 1) { currentLocIndex++; renderDashboard(); }
-});
-
-// --- SEARCH ---
-let searchTimeout;
-function handleSearch(e) {
-    const val = e.target.value;
-    const resultsDiv = document.getElementById('search-results');
-    tempSelectedLocation = null; 
-    clearTimeout(searchTimeout);
-    if (val.length < 3) { resultsDiv.innerHTML = ""; return; }
-
-    searchTimeout = setTimeout(async () => {
-        try {
-            const res = await fetch(`${API.GEO}?name=${val}&count=5&language=en&format=json`);
-            const data = await res.json();
-            if(data.results) {
-                resultsDiv.innerHTML = data.results.map((city, index) => `
-                    <div id="search-item-${index}" class="search-item" onclick="selectLocation(${index}, '${city.name.replace(/'/g, "\\'")}', ${city.latitude}, ${city.longitude})">
-                        <div class="search-item-city">${city.name}</div>
-                        <div class="search-item-country">${city.country}</div>
-                    </div>
-                `).join('');
-            }
-        } catch(e) { console.log(e); }
-    }, 500);
-}
-
-function selectLocation(index, name, lat, lon) {
-    document.querySelectorAll('.search-item').forEach(el => el.classList.remove('selected'));
-    document.getElementById(`search-item-${index}`).classList.add('selected');
-    tempSelectedLocation = { name, lat, lon };
-}
-
-async function confirmAddLocation() {
-    if (!tempSelectedLocation) { alert("Please select a location first."); return; }
-    
-    if (isAlarmLocationSearch) {
-        const name = tempSelectedLocation.name;
-        adHocLocations.add(name);
-        updateLocationDropdown();
-        const select = document.getElementById('new-location-select');
-        select.value = name;
-        isAlarmLocationSearch = false;
-        closeLocationSearch();
-    } else {
-        await fetchAndAddLocation(tempSelectedLocation.name, false, tempSelectedLocation.lat, tempSelectedLocation.lon);
-        closeLocationSearch();
-    }
-}
-
-function closeLocationSearch() { 
-    document.getElementById('location-modal').style.display = 'none'; 
-    if (isAlarmLocationSearch) {
-        const select = document.getElementById('new-location-select');
-        if (select) select.selectedIndex = 0;
-        isAlarmLocationSearch = false;
-    }
-}
-
-function openSettings() { renderSettingsLocations(); document.getElementById('settings-modal').style.display = 'flex'; }
-function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
-function openAddMenu() { document.getElementById('menu-modal').style.display = 'block'; }
-function closeAddMenu() { document.getElementById('menu-modal').style.display = 'none'; }
-function selectMenuOption(opt) { 
-    closeAddMenu(); 
-    if (opt === 'alarm') openAddAlarm(); 
-    else {
-        isAlarmLocationSearch = false;
-        openLocationSearch();
-    }
-}
-
-function openAddAlarm() {
-    selectedDays = []; 
-    editingAlarmIndex = null;
-    document.getElementById('modal-title').innerText = "New Alarm";
-    document.querySelectorAll('.day-btn').forEach(btn => btn.classList.remove('selected'));
-    
-    audio.init();
-
-    updateLocationDropdown();
-    
-    document.getElementById('new-time').value = "07:00";
-    document.getElementById('new-label').value = ""; 
-    document.getElementById('new-aqi').value = "100";
-    document.getElementById('new-aqi-op').value = "lt"; 
-    document.getElementById('new-sound').value = "radar";
-    
-    document.getElementById('new-snooze-toggle').checked = false;
-    document.getElementById('new-snooze-duration').value = "9";
-    document.getElementById('new-snooze-retain').checked = true;
-    toggleSnoozeOptions();
-
-    const locSelect = document.getElementById('new-location-select');
-    if (locSelect.options.length > 0) locSelect.selectedIndex = 0;
-
-    document.getElementById('add-modal').style.display = 'flex';
-}
-
-function openEditAlarm(index) {
-    editingAlarmIndex = index;
-    const alarm = alarms[index];
-    document.getElementById('modal-title').innerText = "Edit Alarm";
-    
-    audio.init();
-
-    const locExists = locations.some(l => l.name === alarm.location);
-    if (!locExists) {
-        adHocLocations.add(alarm.location);
-    }
-    updateLocationDropdown();
-
-    document.getElementById('new-time').value = alarm.time;
-    document.getElementById('new-label').value = alarm.label;
-    document.getElementById('new-location-select').value = alarm.location;
-    
-    if(alarm.conditions && alarm.conditions.length > 0) {
-        document.getElementById('new-alarm-metric').value = alarm.conditions[0].metric || 'aqi';
-        document.getElementById('new-aqi-op').value = alarm.conditions[0].operator;
-        document.getElementById('new-aqi').value = alarm.conditions[0].value;
-    }
-
-    document.getElementById('new-sound').value = alarm.sound;
-    document.getElementById('new-snooze-toggle').checked = !!alarm.snoozeEnabled;
-    document.getElementById('new-snooze-duration').value = alarm.snoozeDuration || 9;
-    document.getElementById('new-snooze-retain').checked = (alarm.snoozeRetainSettings !== false);
-    toggleSnoozeOptions();
-
-    selectedDays = alarm.repeat.includes("Never") ? [] : [...alarm.repeat];
-    document.querySelectorAll('.day-btn').forEach(btn => {
-        const day = btn.getAttribute('data-day');
-        if (selectedDays.includes(day)) btn.classList.add('selected');
-        else btn.classList.remove('selected');
-    });
-
-    closeAddMenu();
-    document.getElementById('add-modal').style.display = 'flex';
-}
-
-function closeAddAlarm() { document.getElementById('add-modal').style.display = 'none'; }
-function openLocationSearch() {
-    document.getElementById('loc-search-input').value = ""; 
-    document.getElementById('search-results').innerHTML = "";
-    document.getElementById('location-modal').style.display = 'flex';
-}
-
-function removeLocation(index) {
-    const realIndex = index + 1; 
-    if (realIndex >= locations.length) return;
-    locations.splice(realIndex, 1);
-    if (currentLocIndex >= locations.length) currentLocIndex = locations.length - 1;
-    renderDashboard();
-}
-
-function renderSettingsLocations() {
-    const container = document.getElementById('settings-location-list');
-    const removableLocs = locations.slice(1);
-    if (removableLocs.length === 0) {
-        container.innerHTML = `<div class="settings-row" style="color: var(--text-secondary); font-size: 14px;">No added locations</div>`;
-    } else {
-        container.innerHTML = removableLocs.map((loc, i) => `
-            <div class="settings-row">
-                <span class="settings-label">${loc.name}</span>
-                <button class="settings-delete-btn" onclick="removeLocation(${i})">Remove</button>
-            </div>
-        `).join('');
-    }
-}
-
-function saveAlarm() {
-    const timeVal = document.getElementById('new-time').value;
-    const val = document.getElementById('new-aqi').value;
-    const locVal = document.getElementById('new-location-select').value;
-    const metricVal = document.getElementById('new-alarm-metric').value; 
-
-    if (!timeVal || !val) {
-        alert("Please set a time and value.");
-        return;
-    }
-    
-    if (locVal === 'search_new') {
-        alert("Please select a valid location.");
-        return;
-    }
-
-    const alarmData = { 
-        time: timeVal, 
-        label: document.getElementById('new-label').value, 
-        location: locVal, 
-        conditions: [{ metric: metricVal, operator: document.getElementById('new-aqi-op').value, value: val }], 
-        repeat: selectedDays.length === 0 ? ["Never"] : [...selectedDays], 
-        sound: document.getElementById('new-sound').value,
-        active: true,
-        snoozeEnabled: document.getElementById('new-snooze-toggle').checked,
-        snoozeDuration: parseInt(document.getElementById('new-snooze-duration').value) || 9,
-        snoozeRetainSettings: document.getElementById('new-snooze-retain').checked
-    };
-
-    if (editingAlarmIndex !== null) {
-        alarms[editingAlarmIndex] = alarmData;
-    } else {
-        alarms.push(alarmData);
-    }
-
-    renderAlarms(); 
-    renderDashboard(); 
-    closeAddAlarm();
-}
-
-function toggleAlarm(index) { alarms[index].active = !alarms[index].active; renderDashboard(); }
-
-function toggleDay(btn) {
-    const day = btn.getAttribute('data-day');
-    if (selectedDays.includes(day)) {
-        selectedDays = selectedDays.filter(d => d !== day);
-        btn.classList.remove('selected');
-    } else {
-        selectedDays.push(day);
-        btn.classList.add('selected');
-    }
-}
-
-function renderAlarms() {
-    const listContainer = document.getElementById('alarm-list-container');
-    listContainer.innerHTML = alarms.map((alarm, index) => {
-        const cond = alarm.conditions[0];
-        const op = cond.operator === 'gt' ? '>' : '<';
-        const metric = cond.metric ? cond.metric.toUpperCase() : 'AQI';
-        return `
-        <div class="alarm-container">
-            <div class="alarm-swipe-actions">
-                <button class="swipe-btn edit" onclick="openEditAlarm(${index})">Edit</button>
-                <button class="swipe-btn delete" onclick="deleteAlarm(${index})">
-                    <svg class="trash-icon" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-                </button>
-            </div>
-            <div class="alarm-row-content" id="row-${index}"
-                    ontouchstart="handleAlarmTouchStart(event, ${index})"
-                    ontouchmove="handleAlarmTouchMove(event, ${index})"
-                    ontouchend="handleAlarmTouchEnd(event, ${index})">
-                <div class="alarm-info">
-                    <div class="alarm-top-line"><span class="alarm-time">${alarm.time}</span><span class="alarm-condition">${metric} ${op} ${cond.value}</span></div>
-                    ${alarm.label ? `<div class="alarm-label">${alarm.label}</div>` : ''}
-                    <div class="alarm-details">${alarm.location} • ${formatDays(alarm.repeat)}</div>
-                </div>
-                <label class="switch">
-                    <input type="checkbox" ${alarm.active ? 'checked' : ''} onchange="toggleAlarm(${index})">
-                    <span class="slider"></span>
-                </label>
-            </div>
-        </div>
-    `}).join('');
-}
-
-let alarmTouchStartX = 0;
-let alarmCurrentSwipeIndex = -1;
-
-function handleAlarmTouchStart(e, index) {
-    alarmTouchStartX = e.touches[0].clientX;
-    alarmCurrentSwipeIndex = index;
-    document.querySelectorAll('.alarm-row-content').forEach(row => {
-        if(row.id !== `row-${index}`) row.style.transform = `translateX(0px)`;
-    });
-}
-
-function handleAlarmTouchMove(e, index) {
-    if (alarmCurrentSwipeIndex !== index) return;
-    const diff = e.touches[0].clientX - alarmTouchStartX;
-    const row = document.getElementById(`row-${index}`);
-    if (diff < 0 && diff > -160) {
-        row.style.transform = `translateX(${diff}px)`;
-    }
-}
-
-function handleAlarmTouchEnd(e, index) {
-    const row = document.getElementById(`row-${index}`);
-    const diff = e.changedTouches[0].clientX - alarmTouchStartX;
-    if (diff < -60) {
-        row.style.transform = `translateX(-150px)`; 
-    } else {
-        row.style.transform = `translateX(0px)`; 
-    }
-}
-
-function deleteAlarm(index) { 
-    alarms.splice(index, 1); 
-    renderAlarms(); 
-    renderDashboard(); 
-}
-
-function formatDays(days) { return days.includes("Never") ? "Once" : (days.length === 7 ? "Daily" : days.map(d => d.slice(0, 3)).join(", ")); }
-
-function toggleSnoozeOptions() {
-    const toggle = document.getElementById('new-snooze-toggle');
-    const options = document.getElementById('snooze-options');
-    if (toggle.checked) {
-        options.style.display = 'block';
-        const modalBody = document.querySelector('#add-modal .modal-body');
-        if (modalBody) {
-            setTimeout(() => {
-                modalBody.scrollTo({ top: modalBody.scrollHeight, behavior: 'smooth' });
-            }, 50);
-        }
-    } else {
-        options.style.display = 'none';
-    }
-}
-
-// ALARM CHECK & TRIGGER
-let lastCheckedMinuteCheck = null; 
+// --- ALARM CHECK LOGIC (UPDATED) ---
+let lastCheckedMinute = null; 
 
 function checkAlarms() {
     const now = new Date();
     const currentMinuteStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); 
     
-    if (lastCheckedMinuteCheck === currentMinuteStr) return;
-    lastCheckedMinuteCheck = currentMinuteStr;
+    if (lastCheckedMinute === currentMinuteStr) return;
+    lastCheckedMinute = currentMinuteStr;
 
     const dayName = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"][now.getDay()];
 
@@ -774,8 +415,15 @@ function checkAlarms() {
 
         if (!locData) return;
 
-        const metric = alarm.conditions[0].metric || 'aqi'; 
-        const currentVal = locData.current[metric] !== undefined ? locData.current[metric] : (metric==='aqi'?calculateAQI(locData.current.pm25):0);
+        // CHECK CONDITION BASED ON METRIC
+        const metric = (alarm.conditions[0].metric || 'aqi');
+        // Get value from current data
+        let currentVal = 0;
+        if (metric === 'aqi') {
+             currentVal = calculateAQI(locData.current.pm25);
+        } else if (locData.current[metric] !== undefined) {
+             currentVal = locData.current[metric];
+        }
         
         const threshold = parseInt(alarm.conditions[0].value);
         const op = alarm.conditions[0].operator; 
@@ -801,6 +449,7 @@ function triggerAlarm(alarm, val, locName, metric) {
     const overlay = document.getElementById('ring-overlay');
     document.getElementById('ring-label').innerText = alarm.label || "Alarm";
     
+    // Display proper metric
     const disp = getMetricDisplay(metric || 'aqi', val);
     document.getElementById('ring-condition').innerText = `${disp.label} is ${disp.val}${disp.unit}`;
     
@@ -858,6 +507,174 @@ function snoozeAlarm() {
     renderAlarms();
     stopAlarm(); 
 }
+
+function toggleSnoozeOptions() {
+    const toggle = document.getElementById('new-snooze-toggle');
+    const options = document.getElementById('snooze-options');
+    if (toggle.checked) {
+        options.style.display = 'block';
+        const modalBody = document.querySelector('#add-modal .modal-body');
+        if (modalBody) {
+            setTimeout(() => {
+                modalBody.scrollTo({ top: modalBody.scrollHeight, behavior: 'smooth' });
+            }, 50);
+        }
+    } else {
+        options.style.display = 'none';
+    }
+}
+
+// --- SAVE ALARM (UPDATED) ---
+function saveAlarm() {
+    const timeVal = document.getElementById('new-time').value;
+    const val = document.getElementById('new-aqi').value;
+    const locVal = document.getElementById('new-location-select').value;
+    const metricVal = document.getElementById('new-alarm-metric').value; 
+
+    if (!timeVal || !val) {
+        alert("Please set a time and value.");
+        return;
+    }
+    
+    if (locVal === 'search_new') {
+        alert("Please select a valid location.");
+        return;
+    }
+
+    const alarmData = { 
+        time: timeVal, 
+        label: document.getElementById('new-label').value, 
+        location: locVal, 
+        // Save Metric
+        conditions: [{ metric: metricVal, operator: document.getElementById('new-aqi-op').value, value: val }], 
+        repeat: selectedDays.length === 0 ? ["Never"] : [...selectedDays], 
+        sound: document.getElementById('new-sound').value,
+        active: true,
+        snoozeEnabled: document.getElementById('new-snooze-toggle').checked,
+        snoozeDuration: parseInt(document.getElementById('new-snooze-duration').value) || 9,
+        snoozeRetainSettings: document.getElementById('new-snooze-retain').checked
+    };
+
+    if (editingAlarmIndex !== null) {
+        alarms[editingAlarmIndex] = alarmData;
+    } else {
+        alarms.push(alarmData);
+    }
+
+    renderAlarms(); 
+    renderDashboard(); 
+    closeAddAlarm();
+}
+
+// --- POPULATE EDIT FORM (UPDATED) ---
+function openEditAlarm(index) {
+    editingAlarmIndex = index;
+    const alarm = alarms[index];
+    document.getElementById('modal-title').innerText = "Edit Alarm";
+    audio.init();
+
+    const locExists = locations.some(l => l.name === alarm.location);
+    if (!locExists) adHocLocations.add(alarm.location);
+    updateLocationDropdown();
+
+    document.getElementById('new-time').value = alarm.time;
+    document.getElementById('new-label').value = alarm.label;
+    document.getElementById('new-location-select').value = alarm.location;
+    
+    // Populate Condition
+    if(alarm.conditions && alarm.conditions.length > 0) {
+        document.getElementById('new-alarm-metric').value = alarm.conditions[0].metric || 'aqi';
+        document.getElementById('new-aqi-op').value = alarm.conditions[0].operator;
+        document.getElementById('new-aqi').value = alarm.conditions[0].value;
+    }
+
+    document.getElementById('new-sound').value = alarm.sound;
+    document.getElementById('new-snooze-toggle').checked = !!alarm.snoozeEnabled;
+    document.getElementById('new-snooze-duration').value = alarm.snoozeDuration || 9;
+    document.getElementById('new-snooze-retain').checked = (alarm.snoozeRetainSettings !== false);
+    toggleSnoozeOptions();
+
+    selectedDays = alarm.repeat.includes("Never") ? [] : [...alarm.repeat];
+    document.querySelectorAll('.day-btn').forEach(btn => {
+        const day = btn.getAttribute('data-day');
+        if (selectedDays.includes(day)) btn.classList.add('selected');
+        else btn.classList.remove('selected');
+    });
+
+    closeAddMenu();
+    document.getElementById('add-modal').style.display = 'flex';
+}
+
+function updatePrimaryIndex(val) {
+    primaryIndex = val;
+    renderDashboard();
+}
+
+// --- UPDATED TEMP UNIT LOGIC ---
+function updateTempUnit(val) {
+    tempUnit = val;
+    renderDashboard();
+}
+
+// --- BOILERPLATE UI FUNCTIONS ---
+function toggleAlarm(index) { alarms[index].active = !alarms[index].active; renderDashboard(); }
+function toggleDay(btn) {
+    const day = btn.getAttribute('data-day');
+    if (selectedDays.includes(day)) {
+        selectedDays = selectedDays.filter(d => d !== day);
+        btn.classList.remove('selected');
+    } else {
+        selectedDays.push(day);
+        btn.classList.add('selected');
+    }
+}
+function renderAlarms() {
+    const listContainer = document.getElementById('alarm-list-container');
+    listContainer.innerHTML = alarms.map((alarm, index) => {
+        const cond = alarm.conditions[0];
+        const op = cond.operator === 'gt' ? '>' : '<';
+        const metric = cond.metric ? cond.metric.toUpperCase() : 'AQI';
+        return `
+        <div class="alarm-container">
+            <div class="alarm-swipe-actions">
+                <button class="swipe-btn edit" onclick="openEditAlarm(${index})">Edit</button>
+                <button class="swipe-btn delete" onclick="deleteAlarm(${index})">
+                    <svg class="trash-icon" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                </button>
+            </div>
+            <div class="alarm-row-content" id="row-${index}"
+                    ontouchstart="handleAlarmTouchStart(event, ${index})"
+                    ontouchmove="handleAlarmTouchMove(event, ${index})"
+                    ontouchend="handleAlarmTouchEnd(event, ${index})">
+                <div class="alarm-info">
+                    <div class="alarm-top-line"><span class="alarm-time">${alarm.time}</span><span class="alarm-condition">${metric} ${op} ${cond.value}</span></div>
+                    ${alarm.label ? `<div class="alarm-label">${alarm.label}</div>` : ''}
+                    <div class="alarm-details">${alarm.location} • ${formatDays(alarm.repeat)}</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" ${alarm.active ? 'checked' : ''} onchange="toggleAlarm(${index})">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+    `}).join('');
+}
+function deleteAlarm(index) { alarms.splice(index, 1); renderAlarms(); renderDashboard(); }
+function formatDays(days) { return days.includes("Never") ? "Once" : (days.length === 7 ? "Daily" : days.map(d => d.slice(0, 3)).join(", ")); }
+function openAddMenu() { document.getElementById('menu-modal').style.display = 'block'; }
+function closeAddMenu() { document.getElementById('menu-modal').style.display = 'none'; }
+function selectMenuOption(opt) { closeAddMenu(); if (opt === 'alarm') openAddAlarm(); else { isAlarmLocationSearch = false; openLocationSearch(); } }
+function openSettings() { renderSettingsLocations(); document.getElementById('settings-modal').style.display = 'flex'; }
+function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
+function closeAddAlarm() { document.getElementById('add-modal').style.display = 'none'; }
+function openLocationSearch() { document.getElementById('loc-search-input').value = ""; document.getElementById('search-results').innerHTML = ""; document.getElementById('location-modal').style.display = 'flex'; }
+function closeLocationSearch() { document.getElementById('location-modal').style.display = 'none'; if(isAlarmLocationSearch){ document.getElementById('new-location-select').selectedIndex=0; isAlarmLocationSearch=false; } }
+function removeLocation(index) { const realIndex = index + 1; if (realIndex >= locations.length) return; locations.splice(realIndex, 1); if (currentLocIndex >= locations.length) currentLocIndex = locations.length - 1; renderDashboard(); }
+function renderSettingsLocations() { const container = document.getElementById('settings-location-list'); const removableLocs = locations.slice(1); if (removableLocs.length === 0) { container.innerHTML = `<div class="settings-row" style="color: var(--text-secondary); font-size: 14px;">No added locations</div>`; } else { container.innerHTML = removableLocs.map((loc, i) => ` <div class="settings-row"> <span class="settings-label">${loc.name}</span> <button class="settings-delete-btn" onclick="removeLocation(${i})">Remove</button> </div> `).join(''); } }
+let alarmTouchStartX = 0; let alarmCurrentSwipeIndex = -1;
+function handleAlarmTouchStart(e, index) { alarmTouchStartX = e.touches[0].clientX; alarmCurrentSwipeIndex = index; document.querySelectorAll('.alarm-row-content').forEach(row => { if(row.id !== `row-${index}`) row.style.transform = `translateX(0px)`; }); }
+function handleAlarmTouchMove(e, index) { if (alarmCurrentSwipeIndex !== index) return; const diff = e.touches[0].clientX - alarmTouchStartX; const row = document.getElementById(`row-${index}`); if (diff < 0 && diff > -160) { row.style.transform = `translateX(${diff}px)`; } }
+function handleAlarmTouchEnd(e, index) { const row = document.getElementById(`row-${index}`); const diff = e.changedTouches[0].clientX - alarmTouchStartX; if (diff < -60) { row.style.transform = `translateX(-150px)`; } else { row.style.transform = `translateX(0px)`; } }
 
 initData();
 renderAlarms();
