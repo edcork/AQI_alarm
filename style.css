@@ -1,4 +1,5 @@
 :root {
+    /* DEFAULT DARK MODE VARIABLES */
     --bg-color: #000000;
     --card-bg: #1C1C1E;
     --text-primary: #FFFFFF;
@@ -37,20 +38,39 @@ body {
     flex-direction: column;
     overflow: hidden;
     overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
-.refresh-spinner {
-    position: absolute; top: 15px; left: 50%; transform: translateX(-50%) scale(0);
-    width: 30px; height: 30px; z-index: 50;
-    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+/* --- REFRESH SPINNER (UPDATED) --- */
+/* Sits behind the dashboard, revealed on pull */
+.refresh-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 60px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 0; /* Behind dashboard */
     pointer-events: none;
 }
-.refresh-spinner.visible { transform: translateX(-50%) scale(1); }
+
 .spinner-icon {
-    width: 100%; height: 100%; animation: spin 1s linear infinite; color: var(--text-secondary);
+    width: 24px;
+    height: 24px;
+    color: var(--text-secondary);
+    opacity: 0; /* Hidden until pulled */
+    transition: opacity 0.2s;
 }
+
+.spinner-icon.spinning {
+    animation: spin 1s linear infinite;
+}
+
 @keyframes spin { 100% { transform: rotate(360deg); } }
 
+/* --- HEADER --- */
 .header {
     position: absolute; top: 0; left: 0; right: 0;
     padding: 50px 20px 10px 20px;
@@ -60,13 +80,25 @@ body {
 .header button { pointer-events: auto; }
 .icon-btn { background: none; border: none; color: var(--accent-color); font-size: 24px; cursor: pointer; padding: 10px; }
 
+/* --- TOP DASHBOARD --- */
 #aqi-area {
     flex: 5; position: relative;
     background: var(--dashboard-bg);
     border-bottom: 1px solid var(--separator-color);
-    overflow: hidden; display: flex; flex-direction: column;
+    overflow: hidden; 
+    display: flex; 
+    flex-direction: column;
+    z-index: 1; /* Sits above spinner */
 }
-#dashboard-slider { display: flex; width: 100%; height: 100%; transition: transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1); }
+
+#dashboard-slider { 
+    display: flex; 
+    width: 100%; 
+    height: 100%; 
+    /* Transformation is handled via JS for pull-to-refresh */
+    will-change: transform;
+}
+
 .dashboard-slide { min-width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; text-align: center; padding-top: 50px; box-sizing: border-box; }
 .aqi-location-row { display: flex; align-items: baseline; gap: 6px; margin-bottom: 0px; }
 .aqi-location { font-size: 18px; font-weight: 500; }
@@ -75,6 +107,7 @@ body {
 .aqi-status { font-size: 20px; font-weight: 500; margin-bottom: 10px; }
 .aqi-details { display: flex; flex-direction: row; gap: 15px; font-size: 12px; color: var(--text-secondary); margin-bottom: 15px; }
 
+/* --- FORECAST CHART --- */
 .forecast-title { width: 100%; text-align: center; font-size: 12px; color: var(--text-secondary); font-weight: 600; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; }
 .forecast-container { width: 90%; height: 100px; display: flex; justify-content: space-between; margin-bottom: 25px; }
 .forecast-column { display: flex; flex-direction: column; flex: 1; height: 100%; align-items: center; position: relative; }
@@ -88,6 +121,7 @@ body {
 .dot { width: 6px; height: 6px; border-radius: 50%; background-color: var(--text-secondary); transition: background-color 0.2s; }
 .dot.active { background-color: var(--text-primary); }
 
+/* --- ALARMS LIST --- */
 #alarms-area { flex: 5; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; overflow-x: hidden; }
 .section-title { font-size: 28px; font-weight: 700; margin-bottom: 20px; padding-left: 5px; }
 .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary); }
