@@ -103,51 +103,6 @@ async function initData() {
     setInterval(checkAlarms, 1000);
 }
 
-// --- NEW: CONDITION COLOR LOGIC (IDEAL RANGES) ---
-// Returns hex color based on "ideal cycling conditions"
-function getConditionColor(metric, val) {
-    if (['aqi', 'pm25', 'pm10', 'no2', 'so2', 'o3', 'co'].includes(metric)) {
-        // Pollutants use standard AQI scale (Green -> Red)
-        // Note: For raw pollutants this is approximate, but fine for UI feedback
-        // If metric is AQI, val is AQI.
-        let v = val;
-        if (metric !== 'aqi') v = calculateAQI(val); // approximated index
-        return getColor(v, 'US'); 
-    }
-    
-    // --- WEATHER SCALES ---
-    // All inputs here are assumed METRIC (C, m/s) because internal storage is metric
-    
-    if (metric === 'temp') {
-        // Ideal: 15-25 C (Green)
-        // Ok: 5-15 or 25-32 (Yellow)
-        // Bad: <5 or >32 (Red)
-        if (val >= 15 && val <= 25) return "var(--success-color)";
-        if ((val >= 5 && val < 15) || (val > 25 && val <= 32)) return "var(--aqi-moderate)";
-        return "var(--danger-color)";
-    }
-    
-    if (metric === 'humidity') {
-        // Ideal: 40-60% (Green)
-        // Ok: 30-40 or 60-80 (Yellow)
-        // Bad: <30 or >80 (Red)
-        if (val >= 40 && val <= 60) return "var(--success-color)";
-        if ((val >= 30 && val < 40) || (val > 60 && val <= 80)) return "var(--aqi-moderate)";
-        return "var(--danger-color)";
-    }
-    
-    if (metric === 'wind') {
-        // Ideal: 0-5 m/s (Green) (0-18 km/h)
-        // Ok: 5-10 m/s (Yellow) (18-36 km/h)
-        // Bad: >10 m/s (Red) (>36 km/h)
-        if (val <= 5) return "var(--success-color)";
-        if (val <= 10) return "var(--aqi-moderate)";
-        return "var(--danger-color)";
-    }
-
-    return '#0A84FF'; // Default Blue
-}
-
 // --- UTILITY: DATA NORMALIZATION & DISPLAY ---
 function getMetricDisplay(metric, val) {
     if (val === undefined || val === null) return { val: '-', unit: '', label: metric, color: '#888' };
@@ -192,6 +147,35 @@ function getMetricDisplay(metric, val) {
     return { val: Math.round(displayVal), unit: meta.unit, label: meta.label, color: color };
 }
 
+// --- NEW: CONDITION COLOR LOGIC (IDEAL RANGES) ---
+function getConditionColor(metric, val) {
+    if (['aqi', 'pm25', 'pm10', 'no2', 'so2', 'o3', 'co'].includes(metric)) {
+        let v = val;
+        if (metric !== 'aqi') v = calculateAQI(val); 
+        return getColor(v, 'US'); 
+    }
+    
+    if (metric === 'temp') {
+        if (val >= 15 && val <= 25) return "var(--success-color)";
+        if ((val >= 5 && val < 15) || (val > 25 && val <= 32)) return "var(--aqi-moderate)";
+        return "var(--danger-color)";
+    }
+    
+    if (metric === 'humidity') {
+        if (val >= 40 && val <= 60) return "var(--success-color)";
+        if ((val >= 30 && val < 40) || (val > 60 && val <= 80)) return "var(--aqi-moderate)";
+        return "var(--danger-color)";
+    }
+    
+    if (metric === 'wind') {
+        if (val <= 5) return "var(--success-color)";
+        if (val <= 10) return "var(--aqi-moderate)";
+        return "var(--danger-color)";
+    }
+
+    return '#0A84FF'; 
+}
+
 function calculateAQI(pm25, standard = 'US') {
     if (pm25 === undefined || pm25 === null) return 0;
     const breakpoints = {
@@ -226,7 +210,7 @@ function getColor(aqi, standard = 'US') {
     return "#7e0023";
 }
 
-// --- DATA FETCHING ---
+// --- DATA FETCHING (TRIPLE SOURCE) ---
 async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
     try {
         if (lat === null || lon === null) {
@@ -300,12 +284,12 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
             const mw = await meteoWeatherRes.value.json();
             // Fallback Current
             if(data.current.temp === undefined && mw.current) data.current.temp = mw.current.temperature_2m;
-            if(data.current.wind === undefined && mw.current) data.current.wind = mw.current.wind_speed_10m / 3.6; // Convert km/h to m/s for consistency
+            if(data.current.wind === undefined && mw.current) data.current.wind = mw.current.wind_speed_10m / 3.6; // Convert km/h to m/s
             if(data.current.humidity === undefined && mw.current) data.current.humidity = mw.current.relative_humidity_2m;
 
             // Forecasts
             data.forecast.temp = mw.hourly.temperature_2m;
-            data.forecast.wind = mw.hourly.wind_speed_10m.map(v => v / 3.6); // Convert all to m/s
+            data.forecast.wind = mw.hourly.wind_speed_10m.map(v => v / 3.6); 
             data.forecast.humidity = mw.hourly.relative_humidity_2m;
         }
 
@@ -355,12 +339,11 @@ function renderDashboard() {
 
         const forecastArr = loc.forecast[primaryIndex] || loc.forecast['aqi'] || [];
         
-        // Scale charts intelligently
         let maxVal = 100; 
         if(primaryIndex === 'aqi') maxVal = 500;
         else if(primaryIndex === 'temp') maxVal = 40; 
         else if(primaryIndex === 'humidity') maxVal = 100;
-        else if(primaryIndex === 'wind') maxVal = 20; // 20 m/s is quite high (~72km/h)
+        else if(primaryIndex === 'wind') maxVal = 20; 
         else if (forecastArr.length > 0) maxVal = Math.max(...forecastArr) || 100;
 
         const currentHourIndex = new Date().getHours(); 
@@ -372,7 +355,6 @@ function renderDashboard() {
                 const val = forecastArr[idx];
                 const h = Math.min((Math.max(val,0) / maxVal) * 100, 100); 
                 
-                // Get Color based on Metric Ideal Range
                 const barColor = getConditionColor(primaryIndex, val);
                 
                 let timeLabel = "";
@@ -478,7 +460,6 @@ function updatePrimaryIndex(val) {
 }
 
 // --- TOUCH & UI BOILERPLATE ---
-// (Keep all touch handling, search, modal functions same as before)
 let touchStartX = 0;
 let touchStartY = 0;
 let isRefreshing = false;
@@ -553,7 +534,8 @@ function handleSearch(e) {
     if (val.length < 3) { resultsDiv.innerHTML = ""; return; }
     searchTimeout = setTimeout(async () => {
         try {
-            const res = await fetch(`${API.GEO}?name=${val}&count=5&language=en&format=json`);
+            // FIXED: Added encodeURIComponent to prevent URL errors with spaces
+            const res = await fetch(`${API.GEO}?name=${encodeURIComponent(val)}&count=5&language=en&format=json`);
             const data = await res.json();
             if(data.results) {
                 resultsDiv.innerHTML = data.results.map((city, index) => `
