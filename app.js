@@ -21,11 +21,199 @@ const API = {
     AIR_WAQI: "https://api.waqi.info/feed"
 };
 
+// --- SOUND ENGINE ---
+class SoundEngine {
+    constructor() {
+        this.ctx = null;
+        this.osc = null;
+        this.interval = null;
+    }
+
+    init() {
+        if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    play(type) {
+        this.stop(); 
+        this.init();
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+
+        switch (type) {
+            case 'radar': this.playRadar(); break;
+            case 'beacon': this.playBeacon(); break;
+            case 'chime': this.playChime(); break;
+            case 'siren': this.playSiren(); break;
+            default: this.playRadar();
+        }
+    }
+
+    stop() {
+        if (this.osc) {
+            try { this.osc.stop(); } catch(e) {}
+            this.osc = null;
+        }
+        if (this.interval) {
+            clearInterval(this.interval);
+            this.interval = null;
+        }
+    }
+
+    playRadar() {
+        const beep = () => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.frequency.setValueAtTime(1200, this.ctx.currentTime);
+            osc.type = 'square';
+            gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.1);
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.1);
+        };
+        beep();
+        let count = 0;
+        this.interval = setInterval(() => {
+            count++;
+            if (count % 8 === 0 || count % 8 === 1 || count % 8 === 2) beep();
+        }, 150);
+    }
+
+    playBeacon() {
+        const ping = () => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.frequency.setValueAtTime(440, this.ctx.currentTime);
+            osc.type = 'sine';
+            gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 1.5);
+            osc.start();
+            osc.stop(this.ctx.currentTime + 1.5);
+        };
+        ping();
+        this.interval = setInterval(ping, 2000);
+    }
+
+    playChime() {
+        const chord = () => {
+            [330, 440, 554].forEach(freq => {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.frequency.value = freq;
+                osc.type = 'triangle';
+                gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 2);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 2);
+            });
+        };
+        chord();
+        this.interval = setInterval(chord, 3000);
+    }
+
+    playSiren() {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.type = 'sawtooth';
+        gain.gain.value = 0.1;
+        osc.start();
+        this.osc = osc;
+        
+        let up = true;
+        this.interval = setInterval(() => {
+            if (up) {
+                osc.frequency.linearRampToValueAtTime(800, this.ctx.currentTime + 0.5);
+                setTimeout(()=> up=false, 500);
+            } else {
+                osc.frequency.linearRampToValueAtTime(400, this.ctx.currentTime + 0.5);
+                setTimeout(()=> up=true, 500);
+            }
+        }, 600);
+    }
+}
+
+const audio = new SoundEngine();
+
 // --- INITIALIZATION ---
 async function initData() {
     if (locations.length === 0) {
         await fetchAndAddLocation("Shanghai", true);
     }
+    // Start Alarm Checker
+    setInterval(checkAlarms, 1000);
+}
+
+// --- ALARM CHECKER ---
+let lastCheckedMinute = null;
+
+function checkAlarms() {
+    const now = new Date();
+    const currentMinuteStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); 
+    
+    if (lastCheckedMinute === currentMinuteStr) return;
+    lastCheckedMinute = currentMinuteStr;
+
+    const dayName = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"][now.getDay()];
+
+    alarms.forEach((alarm, index) => {
+        if (!alarm.active) return;
+
+        if (alarm.time !== currentMinuteStr) return;
+        if (!alarm.repeat.includes("Never") && !alarm.repeat.includes(dayName)) return;
+
+        let locData = null;
+        if (alarm.location.includes("Current")) {
+            locData = locations.find(l => l.isCurrent);
+        } else {
+            locData = locations.find(l => l.name === alarm.location);
+        }
+
+        if (!locData) return;
+
+        const currentAQI = calculateAQI(locData.rawCurrentPM25, currentAQIStandard);
+        const threshold = parseInt(alarm.conditions[0].value);
+        const op = alarm.conditions[0].operator; 
+
+        let conditionMet = false;
+        if (op === 'lt' && currentAQI < threshold) conditionMet = true;
+        if (op === 'gt' && currentAQI > threshold) conditionMet = true;
+
+        if (conditionMet) {
+            triggerAlarm(alarm, currentAQI, locData.name);
+            
+            if (alarm.repeat.includes("Never")) {
+                alarm.active = false;
+                renderAlarms(); 
+            }
+        }
+    });
+}
+
+function triggerAlarm(alarm, aqiVal, locName) {
+    audio.play(alarm.sound);
+
+    const overlay = document.getElementById('ring-overlay');
+    document.getElementById('ring-label').innerText = alarm.label || "Alarm";
+    document.getElementById('ring-condition').innerText = `AQI is ${aqiVal}`;
+    document.getElementById('ring-location').innerText = locName;
+    document.getElementById('ring-time').innerText = alarm.time;
+    
+    const badge = document.getElementById('ring-aqi-badge');
+    badge.innerText = getStatus(aqiVal, currentAQIStandard);
+    badge.style.backgroundColor = getColor(aqiVal, currentAQIStandard);
+
+    overlay.style.display = 'flex';
+}
+
+function stopAlarm() {
+    audio.stop();
+    document.getElementById('ring-overlay').style.display = 'none';
 }
 
 // --- UTILITY ---
@@ -95,7 +283,6 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
 
         const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-        // PARALLEL FETCH
         const [waqiResult, meteoResult] = await Promise.allSettled([
             fetch(`${API.AIR_WAQI}/geo:${lat};${lon}/?token=${WAQI_TOKEN}`),
             fetch(`${API.AIR_METEO}?latitude=${lat}&longitude=${lon}&current=pm2_5&hourly=pm2_5&timezone=${userTimezone}&timeformat=unixtime`)
@@ -104,42 +291,25 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
         let rawCurrentPM25 = 0;
         let lastUpdatedTime = new Date();
         let forecastData = [];
-        let usedSource = "Meteo"; // Debug/Status tracking
-
-        // --- PROCESS WAQI (STRICT MODE) ---
         let waqiSuccess = false;
         
         if (waqiResult.status === 'fulfilled') {
             const waqiData = await waqiResult.value.json();
-            
-            // STRICT CHECK: Does the station specifically report PM2.5?
-            // Some stations only report NO2 or O3, giving a misleadingly low "AQI"
             if (waqiData.status === 'ok' && waqiData.data.iaqi && waqiData.data.iaqi.pm25) {
-                // Success! Use the REAL raw PM2.5 concentration directly
-                // (waqiData.data.iaqi.pm25.v is the concentration value)
                 rawCurrentPM25 = waqiData.data.iaqi.pm25.v;
-                usedSource = "Station";
                 waqiSuccess = true;
-                
                 if (waqiData.data.time && waqiData.data.time.s) {
                     lastUpdatedTime = new Date(waqiData.data.time.s); 
                 }
-            } else {
-                console.warn(`WAQI Data Invalid for ${name}: Missing PM2.5 sensor. Falling back to Model.`);
             }
         }
 
-        // --- PROCESS METEO (Forecast + Fallback) ---
         if (meteoResult.status === 'fulfilled') {
             const meteoData = await meteoResult.value.json();
-            
-            // Fallback Logic: If WAQI failed or didn't have PM2.5, use Meteo Model
             if (!waqiSuccess && meteoData.current) {
                 rawCurrentPM25 = meteoData.current.pm2_5;
                 lastUpdatedTime = new Date(meteoData.current.time * 1000);
             }
-
-            // Always use Meteo for Forecast
             const rawForecastPM25 = meteoData.hourly.pm2_5;
             const currentHourIndex = new Date().getHours(); 
             for (let i = 0; i < 24; i++) {
@@ -170,7 +340,6 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
         else locations.push(newLoc);
 
         if (!isCurrent) currentLocIndex = locations.length - 1;
-        
         renderDashboard();
 
     } catch (e) {
@@ -372,12 +541,9 @@ async function confirmAddLocation() {
     if (isAlarmLocationSearch) {
         const name = tempSelectedLocation.name;
         adHocLocations.add(name);
-        
         updateLocationDropdown();
-        
         const select = document.getElementById('new-location-select');
         select.value = name;
-        
         isAlarmLocationSearch = false;
         closeLocationSearch();
     } else {
@@ -431,22 +597,17 @@ function openAddAlarm() {
 function openEditAlarm(index) {
     editingAlarmIndex = index;
     const alarm = alarms[index];
-    
     document.getElementById('modal-title').innerText = "Edit Alarm";
     
     const locExists = locations.some(l => l.name === alarm.location);
     if (!locExists) {
         adHocLocations.add(alarm.location);
     }
-    
     updateLocationDropdown();
 
     document.getElementById('new-time').value = alarm.time;
     document.getElementById('new-label').value = alarm.label;
-    
-    const locSelect = document.getElementById('new-location-select');
-    locSelect.value = alarm.location;
-
+    document.getElementById('new-location-select').value = alarm.location;
     document.getElementById('new-aqi-op').value = alarm.conditions[0].operator;
     document.getElementById('new-aqi').value = alarm.conditions[0].value;
     document.getElementById('new-sound').value = alarm.sound;

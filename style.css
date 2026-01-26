@@ -13,6 +13,9 @@
     --aqi-good: #30D158;
     --input-bg: #2C2C2E;
     --separator-color: #3A3A3C;
+    
+    /* Preserve the original gradient for dark mode */
+    --dashboard-bg: linear-gradient(180deg, #1c1c1e 0%, #000000 100%);
 }
 
 /* LIGHT MODE OVERRIDES */
@@ -20,10 +23,12 @@
     --bg-color: #F2F2F7;       /* iOS System Gray 6 */
     --card-bg: #FFFFFF;        /* Pure White */
     --text-primary: #000000;
-    --text-secondary: #8E8E93; /* Stays same or #3C3C43 */
+    --text-secondary: #8E8E93; 
     --input-bg: #E5E5EA;       /* iOS System Gray 5 */
     --separator-color: #C6C6C8;
-    /* Semantic colors remain mostly the same, just legible on white */
+    
+    /* Flat background for light mode */
+    --dashboard-bg: #F2F2F7;
 }
 
 body {
@@ -36,6 +41,7 @@ body {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    /* Prevent default bounce on iOS to allow custom pull-to-refresh */
     overscroll-behavior-y: none;
 }
 
@@ -65,14 +71,8 @@ body {
 /* --- TOP DASHBOARD --- */
 #aqi-area {
     flex: 5; position: relative;
-    /* Use variables for gradient to support light mode if needed, 
-       but for now we keep the 'Night' vibe or switch to a light gradient?
-       Let's stick to the variable colors to ensure it switches. 
-       We redefine the background to use the variable. */
-    background: var(--bg-color); 
-    /* Optional: If you want a gradient in light mode, you'd need more vars. 
-       For now, flat bg is cleaner for light mode. */
-    border-bottom: 1px solid var(--separator-color); 
+    background: var(--dashboard-bg);
+    border-bottom: 1px solid var(--separator-color);
     overflow: hidden; display: flex; flex-direction: column;
 }
 #dashboard-slider { display: flex; width: 100%; height: 100%; transition: transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1); }
@@ -228,3 +228,55 @@ input:checked + .slider:before { transform: translateX(20px); }
 .settings-delete-btn { color: var(--danger-color); background: none; border: none; font-size: 16px; font-weight: 500; cursor: pointer; }
 .settings-arrow { color: var(--text-secondary); font-size: 18px; font-weight: 400; }
 .settings-select { width: auto; padding: 5px 25px 5px 10px; height: 32px; background-position: right 5px center; text-align: right; text-align-last: right; direction: ltr; color: var(--text-secondary); }
+
+/* --- RING SCREEN OVERLAY --- */
+.ring-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background-color: var(--bg-color);
+    z-index: 2000;
+    display: none; /* Hidden by default */
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 30px;
+}
+
+.ring-content {
+    display: flex; flex-direction: column; align-items: center; width: 100%;
+    animation: pulse 2s infinite;
+}
+
+.ring-label { font-size: 24px; color: var(--text-secondary); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; }
+.ring-time { font-size: 80px; font-weight: 700; line-height: 1; margin: 10px 0; font-variant-numeric: tabular-nums; }
+.ring-condition { font-size: 22px; color: var(--accent-color); margin-bottom: 5px; font-weight: 600; }
+.ring-location { font-size: 18px; color: var(--text-secondary); margin-bottom: 40px; }
+
+.ring-aqi-badge {
+    padding: 10px 30px;
+    border-radius: 30px;
+    font-size: 24px;
+    font-weight: 700;
+    color: #000; /* Always black text for contrast on colored badges */
+    background-color: var(--success-color);
+    margin-bottom: 60px;
+}
+
+.btn-stop-alarm {
+    width: 80%;
+    max-width: 300px;
+    padding: 20px;
+    background-color: var(--danger-color);
+    color: white;
+    border: none;
+    border-radius: 40px;
+    font-size: 24px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 10px 30px rgba(255, 69, 58, 0.4);
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+}
