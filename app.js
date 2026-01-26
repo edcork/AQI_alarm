@@ -13,8 +13,11 @@ let isAlarmLocationSearch = false;
 let adHocLocations = new Set(); 
 let lastDropdownIndex = 0;
 
+// Track what is ringing for Snooze
+let currentRingingAlarm = null;
+
 // --- API CONFIGURATION ---
-const WAQI_TOKEN = "da26d3ac784af6fd3950dd9958e7a1df4e8f12b6"; // <--- PASTE YOUR TOKEN HERE
+const WAQI_TOKEN = "da26d3ac784af6fd3950dd9958e7a1df4e8f12b6"; 
 const API = {
     GEO: "https://geocoding-api.open-meteo.com/v1/search",
     AIR_METEO: "https://air-quality-api.open-meteo.com/v1/air-quality",
@@ -29,7 +32,6 @@ class SoundEngine {
         this.interval = null;
     }
 
-    // UPDATED: Resume context if suspended (fixes the lag)
     init() {
         if (!this.ctx) {
             this.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -41,7 +43,7 @@ class SoundEngine {
 
     play(type) {
         this.stop(); 
-        this.init(); // Ensure context is ready
+        this.init(); 
         
         switch (type) {
             case 'radar': this.playRadar(); break;
@@ -63,7 +65,6 @@ class SoundEngine {
         }
     }
 
-    // Tone Generators
     playRadar() {
         const beep = () => {
             const osc = this.ctx.createOscillator();
@@ -104,7 +105,7 @@ class SoundEngine {
 
     playChime() {
         const chord = () => {
-            [330, 440, 554].forEach(freq => { // E major
+            [330, 440, 554].forEach(freq => { 
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
                 osc.connect(gain);
@@ -245,7 +246,6 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
         
         if (waqiResult.status === 'fulfilled') {
             const waqiData = await waqiResult.value.json();
-            // Strict Validation: Must contain 'iaqi.pm25'
             if (waqiData.status === 'ok' && waqiData.data.iaqi && waqiData.data.iaqi.pm25) {
                 rawCurrentPM25 = waqiData.data.iaqi.pm25.v;
                 waqiSuccess = true;
@@ -257,7 +257,6 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
 
         if (meteoResult.status === 'fulfilled') {
             const meteoData = await meteoResult.value.json();
-            // Fallback if WAQI failed or didn't have PM2.5
             if (!waqiSuccess && meteoData.current) {
                 rawCurrentPM25 = meteoData.current.pm2_5;
                 lastUpdatedTime = new Date(meteoData.current.time * 1000);
@@ -358,6 +357,7 @@ function checkAlarms() {
 }
 
 function triggerAlarm(alarm, aqiVal, locName) {
+    currentRingingAlarm = alarm; // Save for snooze
     audio.play(alarm.sound);
 
     const overlay = document.getElementById('ring-overlay');
@@ -375,7 +375,39 @@ function triggerAlarm(alarm, aqiVal, locName) {
 
 function stopAlarm() {
     audio.stop();
+    currentRingingAlarm = null;
     document.getElementById('ring-overlay').style.display = 'none';
+}
+
+// --- NEW SNOOZE FUNCTION ---
+function snoozeAlarm() {
+    if (!currentRingingAlarm) return;
+
+    // 1. Calculate Snooze Time (+9 mins)
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + 9);
+    const snoozeTimeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+    // 2. Create Temp Alarm (Unconditional)
+    // We use a trick: threshold -1 with operator 'gt' is always true (since AQI >= 0)
+    // This ensures it rings regardless of air quality.
+    const snoozeAlarmObj = {
+        time: snoozeTimeStr,
+        label: "Snoozing: " + (currentRingingAlarm.label || "Alarm"),
+        location: currentRingingAlarm.location,
+        conditions: [{ metric: 'aqi', operator: 'gt', value: -1 }], 
+        repeat: ["Never"],
+        sound: currentRingingAlarm.sound,
+        active: true,
+        isSnooze: true // Tag it so we could potentially style it differently
+    };
+
+    alarms.push(snoozeAlarmObj);
+    renderAlarms();
+    stopAlarm(); // Stop ringing
+    
+    // Optional: Alert user
+    // alert(`Snoozing until ${snoozeTimeStr}`);
 }
 
 // --- RENDER DASHBOARD ---

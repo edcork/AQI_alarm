@@ -7,7 +7,7 @@
     --accent-color: #0A84FF;
     --danger-color: #FF453A;
     --success-color: #30D158;
-    --edit-color: #8E8E93;
+    --edit-color: #3A3A3C; /* Gray for Snooze/Edit */
     --aqi-moderate: #FFD60A;
     --aqi-unhealthy: #FF9500;
     --aqi-good: #30D158;
@@ -26,6 +26,7 @@
     --text-secondary: #8E8E93; 
     --input-bg: #E5E5EA;       /* iOS System Gray 5 */
     --separator-color: #C6C6C8;
+    --edit-color: #E5E5EA;
     
     /* Flat background for light mode */
     --dashboard-bg: #F2F2F7;
@@ -133,7 +134,7 @@ body {
 }
 
 .swipe-btn.edit {
-    background-color: var(--edit-color);
+    background-color: #8E8E93; /* Neutral for Edit */
     color: white;
 }
 
@@ -234,7 +235,7 @@ input:checked + .slider:before { transform: translateX(20px); }
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
     background-color: var(--bg-color);
     z-index: 2000;
-    display: none; /* Hidden by default */
+    display: none; 
     flex-direction: column;
     align-items: center;
     justify-content: center;
@@ -256,7 +257,7 @@ input:checked + .slider:before { transform: translateX(20px); }
     border-radius: 30px;
     font-size: 24px;
     font-weight: 700;
-    color: #000; /* Always black text for contrast on colored badges */
+    color: #000; /* Contrast */
     background-color: var(--success-color);
     margin-bottom: 60px;
 }
@@ -273,6 +274,20 @@ input:checked + .slider:before { transform: translateX(20px); }
     font-weight: 600;
     cursor: pointer;
     box-shadow: 0 10px 30px rgba(255, 69, 58, 0.4);
+}
+
+.btn-snooze {
+    width: 80%;
+    max-width: 300px;
+    padding: 15px;
+    background-color: var(--edit-color);
+    color: var(--text-primary);
+    border: none;
+    border-radius: 40px;
+    font-size: 20px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 15px;
 }
 
 @keyframes pulse {
