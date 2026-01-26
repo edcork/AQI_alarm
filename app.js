@@ -14,14 +14,14 @@ let adHocLocations = new Set();
 let lastDropdownIndex = 0;
 
 // --- API CONFIGURATION ---
-const WAQI_TOKEN = "YOUR_WAQI_TOKEN_HERE"; // <--- ENSURE YOUR TOKEN IS HERE
+const WAQI_TOKEN = "da26d3ac784af6fd3950dd9958e7a1df4e8f12b6"; // <--- PASTE YOUR TOKEN HERE
 const API = {
     GEO: "https://geocoding-api.open-meteo.com/v1/search",
     AIR_METEO: "https://air-quality-api.open-meteo.com/v1/air-quality",
     AIR_WAQI: "https://api.waqi.info/feed"
 };
 
-// --- SOUND ENGINE ---
+// --- SOUND ENGINE (Web Audio API) ---
 class SoundEngine {
     constructor() {
         this.ctx = null;
@@ -29,15 +29,20 @@ class SoundEngine {
         this.interval = null;
     }
 
+    // UPDATED: Resume context if suspended (fixes the lag)
     init() {
-        if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (!this.ctx) {
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (this.ctx.state === 'suspended') {
+            this.ctx.resume();
+        }
     }
 
     play(type) {
         this.stop(); 
-        this.init();
-        if (this.ctx.state === 'suspended') this.ctx.resume();
-
+        this.init(); // Ensure context is ready
+        
         switch (type) {
             case 'radar': this.playRadar(); break;
             case 'beacon': this.playBeacon(); break;
@@ -58,6 +63,7 @@ class SoundEngine {
         }
     }
 
+    // Tone Generators
     playRadar() {
         const beep = () => {
             const osc = this.ctx.createOscillator();
@@ -98,7 +104,7 @@ class SoundEngine {
 
     playChime() {
         const chord = () => {
-            [330, 440, 554].forEach(freq => {
+            [330, 440, 554].forEach(freq => { // E major
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
                 osc.connect(gain);
@@ -145,12 +151,168 @@ async function initData() {
     if (locations.length === 0) {
         await fetchAndAddLocation("Shanghai", true);
     }
-    // Start Alarm Checker
+    // Start the alarm checker loop
     setInterval(checkAlarms, 1000);
 }
 
-// --- ALARM CHECKER ---
-let lastCheckedMinute = null;
+// --- UTILITY: STANDARDS & CALCULATION ---
+function getStandardMax(standard) {
+    if (standard === 'UK') return 10;
+    return 500;
+}
+
+function convertAQIToRaw(aqi) {
+    if (aqi <= 50) return (aqi / 50) * 12;
+    if (aqi <= 100) return 12 + ((aqi - 50) / 50) * (35.4 - 12);
+    if (aqi <= 150) return 35.5 + ((aqi - 100) / 50) * (55.4 - 35.5);
+    if (aqi <= 200) return 55.5 + ((aqi - 150) / 50) * (150.4 - 55.5);
+    if (aqi <= 300) return 150.5 + ((aqi - 200) / 100) * (250.4 - 150.5);
+    if (aqi <= 400) return 250.5 + ((aqi - 300) / 100) * (350.4 - 250.5);
+    return 350.5 + ((aqi - 400) / 100) * (500.4 - 350.5);
+}
+
+function calculateAQI(pm25, standard = 'US') {
+    const breakpoints = {
+        'US': [[0,12,0,50],[12.1,35.4,51,100],[35.5,55.4,101,150],[55.5,150.4,151,200],[150.5,250.4,201,300],[250.5,350.4,301,400],[350.5,500.4,401,500]],
+        'CN': [[0,35,0,50],[35,75,51,100],[75,115,101,150],[115,150,151,200],[150,250,201,300],[250,350,301,400],[350,500,401,500]],
+        'UK': [[0,11,1,1],[12,23,2,2],[24,35,3,3],[36,41,4,4],[42,47,5,5],[48,53,6,6],[54,58,7,7],[59,64,8,8],[65,70,9,9],[71,1000,10,10]],
+        'IN': [[0,30,0,50],[31,60,51,100],[61,90,101,200],[91,120,201,300],[121,250,301,400],[250,999,401,500]]
+    };
+
+    const std = breakpoints[standard] || breakpoints['US'];
+    for (let i = 0; i < std.length; i++) {
+        const [cLow, cHigh, iLow, iHigh] = std[i];
+        if (pm25 >= cLow && pm25 <= cHigh) {
+            return Math.round(((iHigh - iLow) / (cHigh - cLow)) * (pm25 - cLow) + iLow);
+        }
+    }
+    return standard === 'UK' ? 10 : 500;
+}
+
+function getStatus(aqi, standard = 'US') {
+    if (standard === 'UK') {
+        if (aqi <= 3) return "Low";
+        if (aqi <= 6) return "Moderate";
+        if (aqi <= 9) return "High";
+        return "Very High";
+    }
+    if (aqi <= 50) return "Good";
+    if (aqi <= 100) return "Moderate";
+    if (aqi <= 150) return "Unhealthy (Sens.)";
+    if (aqi <= 200) return "Unhealthy";
+    if (aqi <= 300) return "Very Unhealthy";
+    return "Hazardous";
+}
+
+function getColor(aqi, standard = 'US') {
+    if (standard === 'UK') {
+        if (aqi <= 3) return "var(--success-color)";
+        if (aqi <= 6) return "var(--aqi-unhealthy)";
+        if (aqi <= 9) return "var(--danger-color)";
+        return "#8f3f97";
+    }
+    if (aqi <= 50) return "var(--success-color)";
+    if (aqi <= 100) return "var(--aqi-moderate)";
+    if (aqi <= 150) return "var(--aqi-unhealthy)";
+    if (aqi <= 200) return "var(--danger-color)";
+    if (aqi <= 300) return "#8f3f97";
+    return "#7e0023";
+}
+
+// --- DATA FETCHING (HYBRID) ---
+async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
+    try {
+        if (lat === null || lon === null) {
+            const geoRes = await fetch(`${API.GEO}?name=${name}&count=1&language=en&format=json`);
+            const geoData = await geoRes.json();
+            if (!geoData.results || geoData.results.length === 0) return;
+            lat = geoData.results[0].latitude;
+            lon = geoData.results[0].longitude;
+            name = geoData.results[0].name;
+        }
+
+        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+        const [waqiResult, meteoResult] = await Promise.allSettled([
+            fetch(`${API.AIR_WAQI}/geo:${lat};${lon}/?token=${WAQI_TOKEN}`),
+            fetch(`${API.AIR_METEO}?latitude=${lat}&longitude=${lon}&current=pm2_5&hourly=pm2_5&timezone=${userTimezone}&timeformat=unixtime`)
+        ]);
+
+        let rawCurrentPM25 = 0;
+        let lastUpdatedTime = new Date();
+        let forecastData = [];
+        let waqiSuccess = false;
+        
+        if (waqiResult.status === 'fulfilled') {
+            const waqiData = await waqiResult.value.json();
+            // Strict Validation: Must contain 'iaqi.pm25'
+            if (waqiData.status === 'ok' && waqiData.data.iaqi && waqiData.data.iaqi.pm25) {
+                rawCurrentPM25 = waqiData.data.iaqi.pm25.v;
+                waqiSuccess = true;
+                if (waqiData.data.time && waqiData.data.time.s) {
+                    lastUpdatedTime = new Date(waqiData.data.time.s); 
+                }
+            }
+        }
+
+        if (meteoResult.status === 'fulfilled') {
+            const meteoData = await meteoResult.value.json();
+            // Fallback if WAQI failed or didn't have PM2.5
+            if (!waqiSuccess && meteoData.current) {
+                rawCurrentPM25 = meteoData.current.pm2_5;
+                lastUpdatedTime = new Date(meteoData.current.time * 1000);
+            }
+            const rawForecastPM25 = meteoData.hourly.pm2_5;
+            const currentHourIndex = new Date().getHours(); 
+            for (let i = 0; i < 24; i++) {
+                const idx = currentHourIndex + i;
+                if (idx < rawForecastPM25.length) {
+                    forecastData.push({
+                        rawVal: rawForecastPM25[idx],
+                        hour: (currentHourIndex + i) % 24
+                    });
+                }
+            }
+        }
+
+        const formattedTime = lastUpdatedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: (timeFormat === '12h') });
+
+        const newLoc = {
+            name: name,
+            rawCurrentPM25: rawCurrentPM25,
+            rawForecast: forecastData,
+            pollutant: "PM2.5",
+            time: formattedTime,
+            isCurrent: isCurrent,
+            lat: lat,
+            lon: lon
+        };
+
+        if(isCurrent) locations.unshift(newLoc);
+        else locations.push(newLoc);
+
+        if (!isCurrent) currentLocIndex = locations.length - 1;
+        
+        renderDashboard();
+
+    } catch (e) {
+        console.error("Critical API Error", e);
+    }
+}
+
+async function refreshAllLocations() {
+    const spinner = document.getElementById('refresh-spinner');
+    spinner.classList.add('visible');
+    const oldLocations = [...locations];
+    locations = []; 
+    for (let loc of oldLocations) {
+        await fetchAndAddLocation(loc.name, loc.isCurrent, loc.lat, loc.lon);
+    }
+    setTimeout(() => { spinner.classList.remove('visible'); }, 500);
+}
+
+// --- ALARM CHECK LOGIC ---
+let lastCheckedMinute = null; 
 
 function checkAlarms() {
     const now = new Date();
@@ -216,149 +378,7 @@ function stopAlarm() {
     document.getElementById('ring-overlay').style.display = 'none';
 }
 
-// --- UTILITY ---
-function getStandardMax(standard) {
-    if (standard === 'UK') return 10;
-    return 500;
-}
-
-function calculateAQI(pm25, standard = 'US') {
-    const breakpoints = {
-        'US': [[0,12,0,50],[12.1,35.4,51,100],[35.5,55.4,101,150],[55.5,150.4,151,200],[150.5,250.4,201,300],[250.5,350.4,301,400],[350.5,500.4,401,500]],
-        'CN': [[0,35,0,50],[35,75,51,100],[75,115,101,150],[115,150,151,200],[150,250,201,300],[250,350,301,400],[350,500,401,500]],
-        'UK': [[0,11,1,1],[12,23,2,2],[24,35,3,3],[36,41,4,4],[42,47,5,5],[48,53,6,6],[54,58,7,7],[59,64,8,8],[65,70,9,9],[71,1000,10,10]],
-        'IN': [[0,30,0,50],[31,60,51,100],[61,90,101,200],[91,120,201,300],[121,250,301,400],[250,999,401,500]]
-    };
-    const std = breakpoints[standard] || breakpoints['US'];
-    for (let i = 0; i < std.length; i++) {
-        const [cLow, cHigh, iLow, iHigh] = std[i];
-        if (pm25 >= cLow && pm25 <= cHigh) {
-            return Math.round(((iHigh - iLow) / (cHigh - cLow)) * (pm25 - cLow) + iLow);
-        }
-    }
-    return standard === 'UK' ? 10 : 500;
-}
-
-function getStatus(aqi, standard = 'US') {
-    if (standard === 'UK') {
-        if (aqi <= 3) return "Low";
-        if (aqi <= 6) return "Moderate";
-        if (aqi <= 9) return "High";
-        return "Very High";
-    }
-    if (aqi <= 50) return "Good";
-    if (aqi <= 100) return "Moderate";
-    if (aqi <= 150) return "Unhealthy (Sens.)";
-    if (aqi <= 200) return "Unhealthy";
-    if (aqi <= 300) return "Very Unhealthy";
-    return "Hazardous";
-}
-
-function getColor(aqi, standard = 'US') {
-    if (standard === 'UK') {
-        if (aqi <= 3) return "var(--success-color)";
-        if (aqi <= 6) return "var(--aqi-unhealthy)";
-        if (aqi <= 9) return "var(--danger-color)";
-        return "#8f3f97";
-    }
-    if (aqi <= 50) return "var(--success-color)";
-    if (aqi <= 100) return "var(--aqi-moderate)";
-    if (aqi <= 150) return "var(--aqi-unhealthy)";
-    if (aqi <= 200) return "var(--danger-color)";
-    if (aqi <= 300) return "#8f3f97";
-    return "#7e0023";
-}
-
-// --- DATA FETCHING (STRICT HYBRID) ---
-async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
-    try {
-        if (lat === null || lon === null) {
-            const geoRes = await fetch(`${API.GEO}?name=${name}&count=1&language=en&format=json`);
-            const geoData = await geoRes.json();
-            if (!geoData.results || geoData.results.length === 0) return;
-            lat = geoData.results[0].latitude;
-            lon = geoData.results[0].longitude;
-            name = geoData.results[0].name;
-        }
-
-        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-        const [waqiResult, meteoResult] = await Promise.allSettled([
-            fetch(`${API.AIR_WAQI}/geo:${lat};${lon}/?token=${WAQI_TOKEN}`),
-            fetch(`${API.AIR_METEO}?latitude=${lat}&longitude=${lon}&current=pm2_5&hourly=pm2_5&timezone=${userTimezone}&timeformat=unixtime`)
-        ]);
-
-        let rawCurrentPM25 = 0;
-        let lastUpdatedTime = new Date();
-        let forecastData = [];
-        let waqiSuccess = false;
-        
-        if (waqiResult.status === 'fulfilled') {
-            const waqiData = await waqiResult.value.json();
-            if (waqiData.status === 'ok' && waqiData.data.iaqi && waqiData.data.iaqi.pm25) {
-                rawCurrentPM25 = waqiData.data.iaqi.pm25.v;
-                waqiSuccess = true;
-                if (waqiData.data.time && waqiData.data.time.s) {
-                    lastUpdatedTime = new Date(waqiData.data.time.s); 
-                }
-            }
-        }
-
-        if (meteoResult.status === 'fulfilled') {
-            const meteoData = await meteoResult.value.json();
-            if (!waqiSuccess && meteoData.current) {
-                rawCurrentPM25 = meteoData.current.pm2_5;
-                lastUpdatedTime = new Date(meteoData.current.time * 1000);
-            }
-            const rawForecastPM25 = meteoData.hourly.pm2_5;
-            const currentHourIndex = new Date().getHours(); 
-            for (let i = 0; i < 24; i++) {
-                const idx = currentHourIndex + i;
-                if (idx < rawForecastPM25.length) {
-                    forecastData.push({
-                        rawVal: rawForecastPM25[idx],
-                        hour: (currentHourIndex + i) % 24
-                    });
-                }
-            }
-        }
-
-        const formattedTime = lastUpdatedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: (timeFormat === '12h') });
-
-        const newLoc = {
-            name: name,
-            rawCurrentPM25: rawCurrentPM25,
-            rawForecast: forecastData,
-            pollutant: "PM2.5",
-            time: formattedTime,
-            isCurrent: isCurrent,
-            lat: lat,
-            lon: lon
-        };
-
-        if(isCurrent) locations.unshift(newLoc);
-        else locations.push(newLoc);
-
-        if (!isCurrent) currentLocIndex = locations.length - 1;
-        renderDashboard();
-
-    } catch (e) {
-        console.error("Critical API Error", e);
-    }
-}
-
-async function refreshAllLocations() {
-    const spinner = document.getElementById('refresh-spinner');
-    spinner.classList.add('visible');
-    const oldLocations = [...locations];
-    locations = []; 
-    for (let loc of oldLocations) {
-        await fetchAndAddLocation(loc.name, loc.isCurrent, loc.lat, loc.lon);
-    }
-    setTimeout(() => { spinner.classList.remove('visible'); }, 500);
-}
-
-// --- RENDER ---
+// --- RENDER DASHBOARD ---
 function renderDashboard() {
     const slider = document.getElementById('dashboard-slider');
     const dots = document.getElementById('dots-container');
@@ -457,7 +477,7 @@ function handleLocationSelectChange(select) {
     }
 }
 
-// --- NEW THEME LOGIC ---
+// --- THEME ---
 function updateTheme(isDark) {
     if (isDark) {
         currentTheme = "dark";
@@ -580,6 +600,9 @@ function openAddAlarm() {
     document.getElementById('modal-title').innerText = "New Alarm";
     document.querySelectorAll('.day-btn').forEach(btn => btn.classList.remove('selected'));
     
+    // Pre-warm the audio context on interaction
+    audio.init();
+
     updateLocationDropdown();
     
     document.getElementById('new-time').value = "07:00";
@@ -599,6 +622,9 @@ function openEditAlarm(index) {
     const alarm = alarms[index];
     document.getElementById('modal-title').innerText = "Edit Alarm";
     
+    // Pre-warm audio here too
+    audio.init();
+
     const locExists = locations.some(l => l.name === alarm.location);
     if (!locExists) {
         adHocLocations.add(alarm.location);
