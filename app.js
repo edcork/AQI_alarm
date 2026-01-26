@@ -14,7 +14,7 @@ let adHocLocations = new Set();
 let lastDropdownIndex = 0;
 
 // --- API CONFIGURATION ---
-const WAQI_TOKEN = "da26d3ac784af6fd3950dd9958e7a1df4e8f12b6"; // <--- PASTE YOUR TOKEN HERE
+const WAQI_TOKEN = "YOUR_WAQI_TOKEN_HERE"; // <--- ENSURE YOUR TOKEN IS HERE
 const API = {
     GEO: "https://geocoding-api.open-meteo.com/v1/search",
     AIR_METEO: "https://air-quality-api.open-meteo.com/v1/air-quality",
@@ -24,33 +24,14 @@ const API = {
 // --- INITIALIZATION ---
 async function initData() {
     if (locations.length === 0) {
-        // Default to Shanghai
         await fetchAndAddLocation("Shanghai", true);
     }
 }
 
-// --- UTILITY: STANDARDS & CALCULATION ---
+// --- UTILITY ---
 function getStandardMax(standard) {
     if (standard === 'UK') return 10;
     return 500;
-}
-
-// Converts US AQI (from WAQI) back to raw PM2.5 concentration (approximate)
-// This allows us to re-calculate for UK/China standards
-function convertAQIToRaw(aqi) {
-    // US EPA Breakpoints for PM2.5
-    // AQI Range -> Conc Range
-    // 0-50 -> 0-12
-    // 51-100 -> 12.1-35.4
-    // etc.
-    // Simplified reverse linear interpolation
-    if (aqi <= 50) return (aqi / 50) * 12;
-    if (aqi <= 100) return 12 + ((aqi - 50) / 50) * (35.4 - 12);
-    if (aqi <= 150) return 35.5 + ((aqi - 100) / 50) * (55.4 - 35.5);
-    if (aqi <= 200) return 55.5 + ((aqi - 150) / 50) * (150.4 - 55.5);
-    if (aqi <= 300) return 150.5 + ((aqi - 200) / 100) * (250.4 - 150.5);
-    if (aqi <= 400) return 250.5 + ((aqi - 300) / 100) * (350.4 - 250.5);
-    return 350.5 + ((aqi - 400) / 100) * (500.4 - 350.5);
 }
 
 function calculateAQI(pm25, standard = 'US') {
@@ -100,10 +81,9 @@ function getColor(aqi, standard = 'US') {
     return "#7e0023";
 }
 
-// --- DATA FETCHING (HYBRID STRATEGY) ---
+// --- DATA FETCHING (STRICT HYBRID) ---
 async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
     try {
-        // 1. Get Coordinates if needed
         if (lat === null || lon === null) {
             const geoRes = await fetch(`${API.GEO}?name=${name}&count=1&language=en&format=json`);
             const geoData = await geoRes.json();
@@ -115,8 +95,7 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
 
         const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-        // 2. PARALLEL FETCH: Real-time (WAQI) + Forecast (Meteo)
-        // We use Promise.allSettled to handle partial failures gracefully
+        // PARALLEL FETCH
         const [waqiResult, meteoResult] = await Promise.allSettled([
             fetch(`${API.AIR_WAQI}/geo:${lat};${lon}/?token=${WAQI_TOKEN}`),
             fetch(`${API.AIR_METEO}?latitude=${lat}&longitude=${lon}&current=pm2_5&hourly=pm2_5&timezone=${userTimezone}&timeformat=unixtime`)
@@ -125,38 +104,42 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
         let rawCurrentPM25 = 0;
         let lastUpdatedTime = new Date();
         let forecastData = [];
+        let usedSource = "Meteo"; // Debug/Status tracking
 
-        // --- PROCESS WAQI (Current) ---
+        // --- PROCESS WAQI (STRICT MODE) ---
+        let waqiSuccess = false;
+        
         if (waqiResult.status === 'fulfilled') {
             const waqiData = await waqiResult.value.json();
-            if (waqiData.status === 'ok') {
-                const usAQI = waqiData.data.aqi;
-                // Convert US AQI Index -> Raw PM2.5 for our internal logic
-                rawCurrentPM25 = convertAQIToRaw(usAQI);
+            
+            // STRICT CHECK: Does the station specifically report PM2.5?
+            // Some stations only report NO2 or O3, giving a misleadingly low "AQI"
+            if (waqiData.status === 'ok' && waqiData.data.iaqi && waqiData.data.iaqi.pm25) {
+                // Success! Use the REAL raw PM2.5 concentration directly
+                // (waqiData.data.iaqi.pm25.v is the concentration value)
+                rawCurrentPM25 = waqiData.data.iaqi.pm25.v;
+                usedSource = "Station";
+                waqiSuccess = true;
                 
-                // Use Station Time if available
                 if (waqiData.data.time && waqiData.data.time.s) {
-                    // WAQI returns "2023-10-27 12:00:00" in local station time usually
-                    // We parse explicitly
                     lastUpdatedTime = new Date(waqiData.data.time.s); 
                 }
             } else {
-                console.warn("WAQI Error:", waqiData.data);
-                // Fallback will happen in Meteo block if WAQI fails
+                console.warn(`WAQI Data Invalid for ${name}: Missing PM2.5 sensor. Falling back to Model.`);
             }
         }
 
-        // --- PROCESS OPEN-METEO (Forecast & Fallback) ---
+        // --- PROCESS METEO (Forecast + Fallback) ---
         if (meteoResult.status === 'fulfilled') {
             const meteoData = await meteoResult.value.json();
             
-            // If WAQI failed (e.g. no token, rate limit), use Meteo for current
-            if (rawCurrentPM25 === 0 && meteoData.current) {
+            // Fallback Logic: If WAQI failed or didn't have PM2.5, use Meteo Model
+            if (!waqiSuccess && meteoData.current) {
                 rawCurrentPM25 = meteoData.current.pm2_5;
                 lastUpdatedTime = new Date(meteoData.current.time * 1000);
             }
 
-            // Build Forecast
+            // Always use Meteo for Forecast
             const rawForecastPM25 = meteoData.hourly.pm2_5;
             const currentHourIndex = new Date().getHours(); 
             for (let i = 0; i < 24; i++) {
@@ -170,14 +153,13 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
             }
         }
 
-        // Format the time string
         const formattedTime = lastUpdatedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: (timeFormat === '12h') });
 
         const newLoc = {
             name: name,
             rawCurrentPM25: rawCurrentPM25,
             rawForecast: forecastData,
-            pollutant: "PM2.5", // WAQI is primarily PM2.5 driven
+            pollutant: "PM2.5",
             time: formattedTime,
             isCurrent: isCurrent,
             lat: lat,
@@ -196,7 +178,6 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
     }
 }
 
-// --- STANDARD APP LOGIC (unchanged) ---
 async function refreshAllLocations() {
     const spinner = document.getElementById('refresh-spinner');
     spinner.classList.add('visible');
@@ -208,6 +189,7 @@ async function refreshAllLocations() {
     setTimeout(() => { spinner.classList.remove('visible'); }, 500);
 }
 
+// --- RENDER ---
 function renderDashboard() {
     const slider = document.getElementById('dashboard-slider');
     const dots = document.getElementById('dots-container');
@@ -277,6 +259,7 @@ function renderDashboard() {
     renderSettingsLocations();
 }
 
+// --- UI HELPERS ---
 function updateLocationDropdown() {
     const select = document.getElementById('new-location-select');
     if (!select) return;
@@ -305,6 +288,7 @@ function handleLocationSelectChange(select) {
     }
 }
 
+// --- NEW THEME LOGIC ---
 function updateTheme(isDark) {
     if (isDark) {
         currentTheme = "dark";
@@ -325,6 +309,7 @@ function updateTimeFormat(val) {
     refreshAllLocations();
 }
 
+// --- TOUCH HANDLING ---
 let touchStartY = 0;
 let isRefreshing = false;
 const dashArea = document.getElementById('aqi-area');
@@ -350,6 +335,7 @@ dashArea.addEventListener('touchend', (e) => {
     else if (diff < -50 && currentLocIndex < locations.length - 1) { currentLocIndex++; renderDashboard(); }
 });
 
+// --- SEARCH ---
 let searchTimeout;
 function handleSearch(e) {
     const val = e.target.value;
@@ -386,9 +372,12 @@ async function confirmAddLocation() {
     if (isAlarmLocationSearch) {
         const name = tempSelectedLocation.name;
         adHocLocations.add(name);
+        
         updateLocationDropdown();
+        
         const select = document.getElementById('new-location-select');
         select.value = name;
+        
         isAlarmLocationSearch = false;
         closeLocationSearch();
     } else {
@@ -442,17 +431,22 @@ function openAddAlarm() {
 function openEditAlarm(index) {
     editingAlarmIndex = index;
     const alarm = alarms[index];
+    
     document.getElementById('modal-title').innerText = "Edit Alarm";
     
     const locExists = locations.some(l => l.name === alarm.location);
     if (!locExists) {
         adHocLocations.add(alarm.location);
     }
+    
     updateLocationDropdown();
 
     document.getElementById('new-time').value = alarm.time;
     document.getElementById('new-label').value = alarm.label;
-    document.getElementById('new-location-select').value = alarm.location;
+    
+    const locSelect = document.getElementById('new-location-select');
+    locSelect.value = alarm.location;
+
     document.getElementById('new-aqi-op').value = alarm.conditions[0].operator;
     document.getElementById('new-aqi').value = alarm.conditions[0].value;
     document.getElementById('new-sound').value = alarm.sound;
