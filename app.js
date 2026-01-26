@@ -152,11 +152,10 @@ async function initData() {
     if (locations.length === 0) {
         await fetchAndAddLocation("Shanghai", true);
     }
-    // Start the alarm checker loop
     setInterval(checkAlarms, 1000);
 }
 
-// --- UTILITY: STANDARDS & CALCULATION ---
+// --- UTILITY ---
 function getStandardMax(standard) {
     if (standard === 'UK') return 10;
     return 500;
@@ -179,7 +178,6 @@ function calculateAQI(pm25, standard = 'US') {
         'UK': [[0,11,1,1],[12,23,2,2],[24,35,3,3],[36,41,4,4],[42,47,5,5],[48,53,6,6],[54,58,7,7],[59,64,8,8],[65,70,9,9],[71,1000,10,10]],
         'IN': [[0,30,0,50],[31,60,51,100],[61,90,101,200],[91,120,201,300],[121,250,301,400],[250,999,401,500]]
     };
-
     const std = breakpoints[standard] || breakpoints['US'];
     for (let i = 0; i < std.length; i++) {
         const [cLow, cHigh, iLow, iHigh] = std[i];
@@ -220,7 +218,7 @@ function getColor(aqi, standard = 'US') {
     return "#7e0023";
 }
 
-// --- DATA FETCHING (HYBRID) ---
+// --- DATA FETCHING ---
 async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
     try {
         if (lat === null || lon === null) {
@@ -291,7 +289,6 @@ async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
         else locations.push(newLoc);
 
         if (!isCurrent) currentLocIndex = locations.length - 1;
-        
         renderDashboard();
 
     } catch (e) {
@@ -357,7 +354,7 @@ function checkAlarms() {
 }
 
 function triggerAlarm(alarm, aqiVal, locName) {
-    currentRingingAlarm = alarm; // Save for snooze
+    currentRingingAlarm = alarm; // Save for snooze logic
     audio.play(alarm.sound);
 
     const overlay = document.getElementById('ring-overlay');
@@ -370,6 +367,15 @@ function triggerAlarm(alarm, aqiVal, locName) {
     badge.innerText = getStatus(aqiVal, currentAQIStandard);
     badge.style.backgroundColor = getColor(aqiVal, currentAQIStandard);
 
+    // Show/Hide Snooze Button based on config
+    const snoozeBtn = document.getElementById('btn-snooze');
+    // If undefined (legacy alarms), default to enabled/false? Let's default to disabled if missing
+    if (alarm.snoozeEnabled) {
+        snoozeBtn.style.display = 'block';
+    } else {
+        snoozeBtn.style.display = 'none';
+    }
+
     overlay.style.display = 'flex';
 }
 
@@ -379,35 +385,53 @@ function stopAlarm() {
     document.getElementById('ring-overlay').style.display = 'none';
 }
 
-// --- NEW SNOOZE FUNCTION ---
+// --- NEW SNOOZE LOGIC ---
 function snoozeAlarm() {
     if (!currentRingingAlarm) return;
 
-    // 1. Calculate Snooze Time (+9 mins)
+    // Get Duration (default 9)
+    const duration = currentRingingAlarm.snoozeDuration ? parseInt(currentRingingAlarm.snoozeDuration) : 9;
     const now = new Date();
-    now.setMinutes(now.getMinutes() + 9);
+    now.setMinutes(now.getMinutes() + duration);
     const snoozeTimeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
-    // 2. Create Temp Alarm (Unconditional)
-    // We use a trick: threshold -1 with operator 'gt' is always true (since AQI >= 0)
-    // This ensures it rings regardless of air quality.
+    // Conditional vs Unconditional
+    // If Retain Settings is true: Copy existing conditions
+    // If Retain Settings is false: Force trigger (AQI > -1)
+    let newConditions = [];
+    if (currentRingingAlarm.snoozeRetainSettings) {
+        newConditions = [...currentRingingAlarm.conditions];
+    } else {
+        newConditions = [{ metric: 'aqi', operator: 'gt', value: -1 }];
+    }
+
     const snoozeAlarmObj = {
         time: snoozeTimeStr,
         label: "Snoozing: " + (currentRingingAlarm.label || "Alarm"),
         location: currentRingingAlarm.location,
-        conditions: [{ metric: 'aqi', operator: 'gt', value: -1 }], 
+        conditions: newConditions,
         repeat: ["Never"],
         sound: currentRingingAlarm.sound,
         active: true,
-        isSnooze: true // Tag it so we could potentially style it differently
+        snoozeEnabled: true, // Allow re-snoozing
+        snoozeDuration: duration,
+        snoozeRetainSettings: currentRingingAlarm.snoozeRetainSettings
     };
 
     alarms.push(snoozeAlarmObj);
     renderAlarms();
-    stopAlarm(); // Stop ringing
-    
-    // Optional: Alert user
-    // alert(`Snoozing until ${snoozeTimeStr}`);
+    stopAlarm(); 
+}
+
+// --- UI HELPER FOR SNOOZE OPTIONS ---
+function toggleSnoozeOptions() {
+    const toggle = document.getElementById('new-snooze-toggle');
+    const options = document.getElementById('snooze-options');
+    if (toggle.checked) {
+        options.style.display = 'block';
+    } else {
+        options.style.display = 'none';
+    }
 }
 
 // --- RENDER DASHBOARD ---
@@ -509,7 +533,6 @@ function handleLocationSelectChange(select) {
     }
 }
 
-// --- THEME ---
 function updateTheme(isDark) {
     if (isDark) {
         currentTheme = "dark";
@@ -530,7 +553,6 @@ function updateTimeFormat(val) {
     refreshAllLocations();
 }
 
-// --- TOUCH HANDLING ---
 let touchStartY = 0;
 let isRefreshing = false;
 const dashArea = document.getElementById('aqi-area');
@@ -556,7 +578,6 @@ dashArea.addEventListener('touchend', (e) => {
     else if (diff < -50 && currentLocIndex < locations.length - 1) { currentLocIndex++; renderDashboard(); }
 });
 
-// --- SEARCH ---
 let searchTimeout;
 function handleSearch(e) {
     const val = e.target.value;
@@ -632,7 +653,6 @@ function openAddAlarm() {
     document.getElementById('modal-title').innerText = "New Alarm";
     document.querySelectorAll('.day-btn').forEach(btn => btn.classList.remove('selected'));
     
-    // Pre-warm the audio context on interaction
     audio.init();
 
     updateLocationDropdown();
@@ -643,6 +663,12 @@ function openAddAlarm() {
     document.getElementById('new-aqi-op').value = "lt"; 
     document.getElementById('new-sound').value = "radar";
     
+    // Reset Snooze Fields
+    document.getElementById('new-snooze-toggle').checked = false;
+    document.getElementById('new-snooze-duration').value = "9";
+    document.getElementById('new-snooze-retain').checked = true;
+    toggleSnoozeOptions();
+
     const locSelect = document.getElementById('new-location-select');
     if (locSelect.options.length > 0) locSelect.selectedIndex = 0;
 
@@ -654,7 +680,6 @@ function openEditAlarm(index) {
     const alarm = alarms[index];
     document.getElementById('modal-title').innerText = "Edit Alarm";
     
-    // Pre-warm audio here too
     audio.init();
 
     const locExists = locations.some(l => l.name === alarm.location);
@@ -669,6 +694,12 @@ function openEditAlarm(index) {
     document.getElementById('new-aqi-op').value = alarm.conditions[0].operator;
     document.getElementById('new-aqi').value = alarm.conditions[0].value;
     document.getElementById('new-sound').value = alarm.sound;
+
+    // Populate Snooze Fields
+    document.getElementById('new-snooze-toggle').checked = !!alarm.snoozeEnabled;
+    document.getElementById('new-snooze-duration').value = alarm.snoozeDuration || 9;
+    document.getElementById('new-snooze-retain').checked = (alarm.snoozeRetainSettings !== false); // Default true
+    toggleSnoozeOptions();
 
     selectedDays = alarm.repeat.includes("Never") ? [] : [...alarm.repeat];
     document.querySelectorAll('.day-btn').forEach(btn => {
@@ -733,7 +764,11 @@ function saveAlarm() {
         conditions: [{ metric: 'aqi', operator: document.getElementById('new-aqi-op').value, value: aqiVal }], 
         repeat: selectedDays.length === 0 ? ["Never"] : [...selectedDays], 
         sound: document.getElementById('new-sound').value,
-        active: true 
+        active: true,
+        // Save New Snooze Config
+        snoozeEnabled: document.getElementById('new-snooze-toggle').checked,
+        snoozeDuration: parseInt(document.getElementById('new-snooze-duration').value) || 9,
+        snoozeRetainSettings: document.getElementById('new-snooze-retain').checked
     };
 
     if (editingAlarmIndex !== null) {
