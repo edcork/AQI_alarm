@@ -18,7 +18,7 @@ let currentRingingAlarm = null;
 
 const WAQI_TOKEN = "da26d3ac784af6fd3950dd9958e7a1df4e8f12b6"; 
 const API = {
-    // SWITCHED TO NOMINATIM (OpenStreetMap)
+    // NOMINATIM (OpenStreetMap)
     GEO: "https://nominatim.openstreetmap.org/search",
     AIR_METEO: "https://air-quality-api.open-meteo.com/v1/air-quality",
     WEATHER_METEO: "https://api.open-meteo.com/v1/forecast", 
@@ -99,9 +99,7 @@ const audio = new SoundEngine();
 // --- INITIALIZATION ---
 async function initData() {
     if (locations.length === 0) {
-        // Initial load using Nominatim or specific lat/lon for stability
-        // Shanghai: 31.2304, 121.4737
-        await fetchAndAddLocation("Shanghai", true, 31.2304, 121.4737);
+        await fetchAndAddLocation("Shanghai", true);
     }
     setInterval(checkAlarms, 1000);
 }
@@ -217,13 +215,12 @@ function getColor(aqi, standard = 'US') {
 async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
     try {
         if (lat === null || lon === null) {
-            // Use NOMINATIM for direct fetch if coordinates missing
             const geoRes = await fetch(`${API.GEO}?q=${encodeURIComponent(name)}&format=json&limit=1`);
             const geoData = await geoRes.json();
             if (!geoData || geoData.length === 0) return;
             lat = geoData[0].lat;
             lon = geoData[0].lon;
-            name = geoData[0].display_name.split(',')[0]; // Grab first part of address
+            name = geoData[0].display_name.split(',')[0];
         }
 
         const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -530,13 +527,15 @@ dashArea.addEventListener('touchend', (e) => {
     }
 });
 
+// --- ADDED MISSING VARIABLE DECLARATION ---
+let searchTimeout; 
+
 function handleSearch(e) {
     const val = e.target.value;
     const resultsDiv = document.getElementById('search-results');
     tempSelectedLocation = null; 
     clearTimeout(searchTimeout);
     
-    // UPDATED: Threshold lowered to 2 characters
     if (val.length < 2) { resultsDiv.innerHTML = ""; return; }
     
     searchTimeout = setTimeout(async () => {
