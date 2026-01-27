@@ -18,7 +18,8 @@ let currentRingingAlarm = null;
 
 const WAQI_TOKEN = "da26d3ac784af6fd3950dd9958e7a1df4e8f12b6"; 
 const API = {
-    GEO: "https://geocoding-api.open-meteo.com/v1/search",
+    // SWITCHED TO NOMINATIM (OpenStreetMap)
+    GEO: "https://nominatim.openstreetmap.org/search",
     AIR_METEO: "https://air-quality-api.open-meteo.com/v1/air-quality",
     WEATHER_METEO: "https://api.open-meteo.com/v1/forecast", 
     AIR_WAQI: "https://api.waqi.info/feed"
@@ -98,7 +99,9 @@ const audio = new SoundEngine();
 // --- INITIALIZATION ---
 async function initData() {
     if (locations.length === 0) {
-        await fetchAndAddLocation("Shanghai", true);
+        // Initial load using Nominatim or specific lat/lon for stability
+        // Shanghai: 31.2304, 121.4737
+        await fetchAndAddLocation("Shanghai", true, 31.2304, 121.4737);
     }
     setInterval(checkAlarms, 1000);
 }
@@ -214,12 +217,13 @@ function getColor(aqi, standard = 'US') {
 async function fetchAndAddLocation(name, isCurrent, lat = null, lon = null) {
     try {
         if (lat === null || lon === null) {
-            const geoRes = await fetch(`${API.GEO}?name=${name}&count=1&language=en&format=json`);
+            // Use NOMINATIM for direct fetch if coordinates missing
+            const geoRes = await fetch(`${API.GEO}?q=${encodeURIComponent(name)}&format=json&limit=1`);
             const geoData = await geoRes.json();
-            if (!geoData.results || geoData.results.length === 0) return;
-            lat = geoData.results[0].latitude;
-            lon = geoData.results[0].longitude;
-            name = geoData.results[0].name;
+            if (!geoData || geoData.length === 0) return;
+            lat = geoData[0].lat;
+            lon = geoData[0].lon;
+            name = geoData[0].display_name.split(',')[0]; // Grab first part of address
         }
 
         const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -537,18 +541,26 @@ function handleSearch(e) {
     
     searchTimeout = setTimeout(async () => {
         try {
-            // FIXED: URL Encode to handle spaces (e.g. "San Francisco")
-            const res = await fetch(`${API.GEO}?name=${encodeURIComponent(val)}&count=5&language=en&format=json`);
+            // FIXED: SEARCH USING NOMINATIM
+            // Use 'format=json' & 'limit=5'
+            const res = await fetch(`${API.GEO}?q=${encodeURIComponent(val)}&format=json&limit=5`);
             const data = await res.json();
-            if(data.results && data.results.length > 0) {
-                resultsDiv.innerHTML = data.results.map((city, index) => `
-                    <div id="search-item-${index}" class="search-item" onclick="selectLocation(${index}, '${city.name.replace(/'/g, "\\'")}', ${city.latitude}, ${city.longitude})">
-                        <div class="search-item-city">${city.name}</div>
-                        <div class="search-item-country">${city.country}</div>
+            
+            // Nominatim returns an array directly
+            if(data && data.length > 0) {
+                resultsDiv.innerHTML = data.map((place, index) => {
+                    // Parse Display Name (City, Country)
+                    const parts = place.display_name.split(',');
+                    const city = parts[0];
+                    const country = parts[parts.length - 1];
+                    
+                    return `
+                    <div id="search-item-${index}" class="search-item" onclick="selectLocation(${index}, '${city.replace(/'/g, "\\'")}', ${place.lat}, ${place.lon})">
+                        <div class="search-item-city">${city}</div>
+                        <div class="search-item-country">${country}</div>
                     </div>
-                `).join('');
+                `}).join('');
             } else {
-                // FIXED: Explicit "No Results" state
                 resultsDiv.innerHTML = '<div style="padding:15px; text-align:center; color:var(--text-secondary);">No results found</div>';
             }
         } catch(e) { console.log(e); }
